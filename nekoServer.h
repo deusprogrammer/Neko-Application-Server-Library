@@ -91,6 +91,12 @@ DWORD WINAPI SocketThread(LPVOID lpargs);
 void* SocketThread(void* lpargs);
 #endif
 
+#ifdef _WIN32
+DWORD WINAPI ServerThread(LPVOID lpargs);
+#else
+void* ServerThread(void* lpargs);
+#endif
+
 void Easter() {
    printf("%s\n\n", NYAN2);
 }
@@ -103,6 +109,8 @@ void PrintNekoBadge() {
 enum HTTPProtocol {HTTP, HTTPS};
 
 enum HTTPVerb {GET, PUT, POST, DELETE};
+
+enum AppServerStatus {RUNNING, STOPPED, PAUSED};
 
 struct HTTPQueryPair {
    char key[32], value[128];
@@ -228,8 +236,9 @@ struct ApplicationServerArgs {
 };
 
 class ApplicationServer {
-private:
+protected:
    HTTPProtocol type;
+   AppServerStatus status;
    char appName[32];
    char port[8];
    WebService getServices[128];
@@ -240,15 +249,41 @@ private:
    int nPutServices;
    int nPostServices;
    int nDeleteServices;
-   int serverLoop();
 public:
    ApplicationServer();
    ~ApplicationServer() {if (type == HTTPS) CleanUpSSL();}
    ApplicationServer(HTTPProtocol type, char* appName = "NekoServer", char* port = NULL);
    void addService(HTTPVerb verb, char* resourceName, void *(*funcPtr)(Socket*, HTTPHeaderObject*, void*));
-   void start() {this->serverLoop();}
+   void start();
+   void stop();
+
+   AppServerStatus getStatus() {return status;}
+   void setStatus(AppServerStatus status) {this->status = status;}
+   char* getPort() {return port;}
+   char* getAppName() {return appName;}
+   HTTPProtocol getType() {return type;}
+
    WebService* fetchService(HTTPVerb verb, char* resourceName);
+
+   bool isRunning() {return status == RUNNING;}
+
+#ifdef _WIN32
+   friend DWORD WINAPI ServerSocket(void* lpargs);
+   friend DWORD WINAPI SocketSocket(void* lpargs);
+#else
+   friend void* ServerSocket(void* lpargs);
+   friend void* SocketSocket(void* lpargs);
+#endif
 };
+
+void ApplicationServer::start() {
+   PrintNekoBadge();
+   CreateThreadM(ServerThread, this);
+}
+
+void ApplicationServer::stop() {
+   this->status = STOPPED;
+}
 
 ApplicationServer::ApplicationServer() {
    type = HTTP;
@@ -336,59 +371,72 @@ WebService* ApplicationServer::fetchService(HTTPVerb verb, char* resourceName) {
    return NULL;
 }
 
-int ApplicationServer::serverLoop() {
-      SOCKET server, client;
-      Socket* tsocket;
-      ApplicationServerArgs* appArgs;
+#ifdef _WIN32
+DWORD WINAPI ServerThread(LPVOID lpargs) {
+#else
+void* ServerThread(void* lpargs) {
+#endif
+   ApplicationServer* appServer = (ApplicationServer*)lpargs;
+   SOCKET server, client;
+   Socket* tsocket;
+   ApplicationServerArgs* appArgs;
+   char* port = appServer->getPort();
 
-      PrintNekoBadge();
-      
-      #ifdef _WIN32
-      InitializeWS();
-      #endif
+   appServer->setStatus(RUNNING);
+         
+   #ifdef _WIN32
+   InitializeWS();
+   #endif
 
-      //Open server socket, type can be either TCP or UDP...this example uses TCP
-      if (OpenServerSocket(&server, port, IPV4, TCP) == -1) {
-         return 0;
+   //Open server socket, type can be either TCP or UDP...this example uses TCP
+   if (OpenServerSocket(&server, port, IPV4, TCP) == -1) {
+      appServer->stop();
+      ExitThreadM(0);
+   }
+
+   printf("%s listening on port %s...\n", appServer->getAppName(), appServer->getPort());
+
+   if (appServer->getType() == HTTPS)
+      printf("Using %s\n", SSLeay_version(SSLEAY_VERSION));
+
+   //Start an accept connection loop
+   while((client = AcceptConnection(server)) && appServer->getStatus() == RUNNING) {
+      char* connectedIP = GetIPAddressString(GetConnectedIP(&client));
+      printf("Connection from %s\n", connectedIP);
+
+      switch (appServer->getType()) {
+      case HTTP:
+         tsocket = new TCPSocket();
+         break;
+      case HTTPS:
+         tsocket = new SSLTCPSocket();
+         break;
+      };
+
+      if(!tsocket->setFD(client)) {
+         CloseSocket(client);
+         continue;
       }
-
-      printf("%s listening on port %s...\n", appName, port);
-
-      //Start an accept connection loop
-      while(client = AcceptConnection(server)) {
-         char* connectedIP = GetIPAddressString(GetConnectedIP(&client));
-         printf("Connection from %s\n", connectedIP);
-
-         switch (type) {
-         case HTTP:
-            tsocket = new TCPSocket();
-            break;
-         case HTTPS:
-            tsocket = new SSLTCPSocket();
-            break;
-         };
-
-         if(!tsocket->setFD(client)) {
-            CloseSocket(client);
-            continue;
-         }
             
 
-         appArgs = new ApplicationServerArgs();
+      appArgs = new ApplicationServerArgs();
 
-         appArgs->appServer = this;
-         appArgs->sock = tsocket;
+      appArgs->appServer = appServer;
+      appArgs->sock = tsocket;
          
-         CreateThreadM(SocketThread, (LPVOID)appArgs);
-      }
+      CreateThreadM(SocketThread, (LPVOID)appArgs);
+   }
 
-      CloseSocket(server);
+   appServer->setStatus(STOPPED);
 
-      #ifdef _WIN32
-      CleanupWS();
-      #endif
+   CloseSocket(server);
 
-      return 0;
+   #ifdef _WIN32
+   CleanupWS();
+   #endif
+
+
+   ExitThreadM(0);
 }
 
 #ifdef _WIN32
@@ -427,7 +475,7 @@ void* SocketThread(void* lpargs) {
       webService->callback(client, &header, data);
    }
    else {
-      printf("\tUnable to find %s!\n", header.getRequest()->getResource());
+      fprintf(stderr, "\tUnable to find %s!\n", header.getRequest()->getResource());
       client->write((void*)HTTP_404, sizeof(HTTP_404) - 1);
       client->close();
    }

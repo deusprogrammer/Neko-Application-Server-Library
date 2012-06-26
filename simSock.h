@@ -181,12 +181,12 @@ bool SSLTCPSocket::setFD(SOCKET sock) {
    this->sock = sock;
 
    if ((ssl = SSL_new(tlsctx)) == NULL) {
-      printf("SSL_new failed!\n");
+      fprintf(stderr, "SSL_new failed!\n");
       return false;
    }
 
    if (!SSL_set_fd(ssl, sock)) {
-      printf("SSL_set_fd failed!\n");
+      fprintf(stderr, "SSL_set_fd failed!\n");
 
       SSL_shutdown(ssl);
       SSL_free(ssl);
@@ -194,7 +194,7 @@ bool SSLTCPSocket::setFD(SOCKET sock) {
    }
 
    if (SSL_accept(ssl) <= 0) {
-      printf("SSL_accept failed!\n");
+      fprintf(stderr, "SSL_accept failed!\n");
 
       SSL_shutdown(ssl);
       SSL_free(ssl);
@@ -248,7 +248,7 @@ int InitializeWS() {
    // Initialize Winsock
    iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
    if (iResult != 0) {
-      printf("WSAStartup failed: %d\n", iResult);
+      fprintf(stderr, "WSAStartup failed: %d\n", iResult);
       return -1;
    }
 
@@ -285,7 +285,7 @@ int OpenClientSocket(int *pSock, char *hostname, char *port, int ip_version, int
    // Resolve the server address and port
    iResult = getaddrinfo(hostname, port, &hints, &result);
    if (iResult != 0) {
-      printf("Unable to resolve host: %s (%d)\n", hostname, WSAGetLastError());
+      fprintf(stderr, "Unable to resolve host: %s (%d)\n", hostname, WSAGetLastError());
        //WSACleanup();
       return -1;
    }
@@ -300,7 +300,7 @@ int OpenClientSocket(int *pSock, char *hostname, char *port, int ip_version, int
    *pSock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
 
    if (*pSock == INVALID_SOCKET) {
-      printf("Error creating socket: %ld\n", WSAGetLastError());
+      fprintf(stderr, "Error creating socket: %ld\n", WSAGetLastError());
       freeaddrinfo(result);
       //WSACleanup();
       return -1;
@@ -316,7 +316,7 @@ int OpenClientSocket(int *pSock, char *hostname, char *port, int ip_version, int
    freeaddrinfo(result);
 
    if (*pSock == INVALID_SOCKET) {
-      printf("Unable to connect to server: (%d)!\n", WSAGetLastError());
+      fprintf(stderr, "Unable to connect to server: (%d)!\n", WSAGetLastError());
       //WSACleanup();
       return -1;
    }
@@ -348,7 +348,7 @@ int OpenClientSocket(int *pSock, char *hostname, char *port, int ip_version, int
    // Resolve the server address and port
    iResult = getaddrinfo(hostname, port, &hints, &result);
    if (iResult != 0) {
-      printf("Unable to resolve host: %s (%d)\n", hostname, errno);
+      fprintf(stderr, "Unable to resolve host: %s (%d)\n", hostname, errno);
       return -1;
    }
 
@@ -360,7 +360,7 @@ int OpenClientSocket(int *pSock, char *hostname, char *port, int ip_version, int
    sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
 
    if (sock == INVALID_SOCKET) {
-      printf("Error creating socket: %d\n", errno);
+      fprintf(stderr, "Error creating socket: %d\n", errno);
       freeaddrinfo(result);
       return -1;
    }
@@ -375,7 +375,7 @@ int OpenClientSocket(int *pSock, char *hostname, char *port, int ip_version, int
    freeaddrinfo(result);
 
    if (sock == INVALID_SOCKET) {
-      printf("Unable to connect to server: (%d)!\n", errno);
+      fprintf(stderr, "Unable to connect to server: (%d)!\n", errno);
       return -1;
    }
 
@@ -407,7 +407,7 @@ int OpenServerSocket(SOCKET *pSock, char *port, int ip_version, int type) {
    // Resolve the local address and port to be used by the server
    iResult = getaddrinfo(NULL, port, &hints, &result);
    if (iResult != 0) {
-      printf("getaddrinfo failed: %d\n", iResult);
+      fprintf(stderr, "getaddrinfo failed: %d\n", iResult);
       //WSACleanup();
       return -1;
    }
@@ -418,7 +418,7 @@ int OpenServerSocket(SOCKET *pSock, char *port, int ip_version, int type) {
    *pSock = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 
    if (*pSock == INVALID_SOCKET) {
-      printf("Error at socket(): %ld\n", WSAGetLastError());
+      fprintf(stderr, "Error at socket(): %ld\n", WSAGetLastError());
       freeaddrinfo(result);
       //WSACleanup();
       return -1;
@@ -427,7 +427,7 @@ int OpenServerSocket(SOCKET *pSock, char *port, int ip_version, int type) {
    // Setup the TCP listening socket
    iResult = bind(*pSock, result->ai_addr, (int)result->ai_addrlen);
    if (iResult == SOCKET_ERROR) {
-      printf("bind failed: %d\n", WSAGetLastError());
+      fprintf(stderr, "bind failed: %d\n", WSAGetLastError());
       freeaddrinfo(result);
       closesocket(*pSock);
       //WSACleanup();
@@ -438,7 +438,7 @@ int OpenServerSocket(SOCKET *pSock, char *port, int ip_version, int type) {
 
    if(type!=UDP){
       if (listen(*pSock, SOMAXCONN ) == SOCKET_ERROR ) {
-         printf( "Listen failed with error: %ld\n", WSAGetLastError() );
+         fprintf(stderr, "Listen failed with error: %ld\n", WSAGetLastError() );
          closesocket(*pSock);
          //WSACleanup();
          return -1;
@@ -470,7 +470,7 @@ int OpenServerSocket(SOCKET *pSock, char *port, int ip_version, int type) {
    // Resolve the local address and port to be used by the server
    iResult = getaddrinfo(NULL, port, &hints, &result);
    if (iResult != 0) {
-      printf("getaddrinfo failed: %d\n", errno);
+      fprintf(stderr, "getaddrinfo failed: %d\n", errno);
       return -1;
    }
 
@@ -478,7 +478,7 @@ int OpenServerSocket(SOCKET *pSock, char *port, int ip_version, int type) {
    sock = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 
    if (sock == INVALID_SOCKET) {
-      printf("Error at socket(): %d\n", errno);
+      fprintf(stderr, "Error at socket(): %d\n", errno);
       freeaddrinfo(result);
       return -1;
    }
@@ -486,7 +486,7 @@ int OpenServerSocket(SOCKET *pSock, char *port, int ip_version, int type) {
    // Setup the TCP listening socket
    iResult = bind(sock, result->ai_addr, (int)result->ai_addrlen);
    if (iResult == SOCKET_ERROR) {
-      printf("bind failed: %d\n", errno);
+      fprintf(stderr, "bind failed: %d\n", errno);
       freeaddrinfo(result);
       close(sock);
       return -1;
@@ -496,7 +496,7 @@ int OpenServerSocket(SOCKET *pSock, char *port, int ip_version, int type) {
 
    //Start listening on socket
    if (listen(sock, SOMAXCONN ) == SOCKET_ERROR ) {
-      printf( "Listen failed with error: %d\n", errno );
+      fprintf(stderr, "Listen failed with error: %d\n", errno );
       close(sock);
       return -1;
    }
