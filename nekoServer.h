@@ -6,6 +6,7 @@
 #include "simSock.h"
 #include "strutils.h"
 #include "thread.h"
+#include "timer.h"
 
 #ifndef NEKOSERVER_H
 #define NEKOSERVER_H
@@ -13,6 +14,8 @@
 #ifndef SOCKET
 #define SOCKET int
 #endif
+
+#define TIMEOUT 1000
 
 #define HTTP_404 "HTTP/1.1 404 Not Found\r\n\r\n<html><body><h1>File Not Found!</h1></body></html>"
 
@@ -459,6 +462,8 @@ void* SocketThread(void* lpargs) {
    Socket* client = asa->sock;
    ApplicationServer* appServer = asa->appServer;
    HTTPHeaderObject header;
+   Timer timer(TIMEOUT);
+   timer.start();
 
    client->setNoBlock();
 
@@ -473,8 +478,13 @@ void* SocketThread(void* lpargs) {
       //Socket open, but no data
       else if (nBytes < 0 && client->wouldBlock()) {
          //Implement a timeout here.
-
-         continue;
+         if (timer.isExpired()) {
+            printf("TIME OUT!\n");
+            client->close();
+            ExitThreadM(0);
+         }
+         else
+            continue;
       }
       //Socket closed
       else if (nBytes < 0 && !client->wouldBlock()) {
@@ -493,6 +503,8 @@ void* SocketThread(void* lpargs) {
             client->close();
             ExitThreadM(0);
          }
+
+         timer.reset();
       }
    }
 
