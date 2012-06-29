@@ -98,38 +98,20 @@ void CleanUpSSL() {
 class Socket {
 protected:
    SOCKET sock;
-   int error;
 public:
    Socket() {sock = -1;}
    ~Socket() {}
    virtual bool setFD(SOCKET sock) {this->sock = sock; return true;}
-   virtual bool setNoBlock();
-   virtual bool wouldBlock() {return errno == EWOULDBLOCK;}
-   virtual int getError() {return errno;}
-
+   void setNoBlock();
    virtual int write(LPVOID data, int buf_sz) {}
    virtual int read(LPVOID data, int buf_sz) {}
    virtual int readLine(LPVOID data, int buf_sz) {}
    virtual void close() {CloseSocket(sock);}
 };
 
-bool Socket::setNoBlock() {
-   int ret = -1;
-   int flags;
-
-   if (sock >= 0) {
-      flags = fcntl(sock, F_GETFL, 0);
-      ret = fcntl(sock, F_SETFL, flags | O_NONBLOCK);
-
-      if (ret < 0) {
-         perror("fcntl failed...");
-      }
-   }
-   else {
-      printf("Socket isn't initialized!\n");
-   }
-
-   return ret != -1;
+void Socket::setNoBlock() {
+   int flags = fcntl(sock, F_GETFL, 0);
+   fcntl(sock, F_SETFL, flags | O_NONBLOCK);
 }
 
 class TCPSocket: public Socket {
@@ -138,35 +120,12 @@ protected:
 public:
    TCPSocket() {sock = -1;}
    ~TCPSocket() {}
-   bool setFD(SOCKET sock) {printf("SET FD TO %d\n", sock); this->sock = sock; return true;}
-   bool setNoBlock();
-   bool wouldBlock() {return errno == EWOULDBLOCK;}
-   int getError() {return errno;}
-
+   bool setFD(SOCKET sock) {this->sock = sock; return true;}
    int write(LPVOID data, int buf_sz);
    int read(LPVOID data, int buf_sz);
    int readLine(LPVOID data, int buf_sz);
    void close();
 };
-
-bool TCPSocket::setNoBlock() {
-   int ret = -1;
-   int flags;
-
-   if (sock >= 0) {
-      flags = fcntl(sock, F_GETFL, 0);
-      ret = fcntl(sock, F_SETFL, flags | O_NONBLOCK);
-
-      if (ret < 0) {
-         perror("fcntl failed...");
-      }
-   }
-   else {
-      printf("Socket isn't initialized!\n");
-   }
-
-   return ret != -1;
-}
 
 int TCPSocket::write(LPVOID data, int buf_sz) {
    //printf("IN TCPSocket::write()\n");
@@ -196,10 +155,6 @@ public:
    ~SSLTCPSocket();
 
    bool setFD(SOCKET sock);
-   bool setNoBlock();
-   bool wouldBlock() {return errno == EWOULDBLOCK;}
-   int getError() {return errno;}
-
    int write(LPVOID data, int buf_sz);
    int read(LPVOID data, int buf_sz);
    int readLine(LPVOID data, int buf_sz);
@@ -229,8 +184,6 @@ SSLTCPSocket::~SSLTCPSocket() {
 }
 
 bool SSLTCPSocket::setFD(SOCKET sock) {
-   printf("SET FD TO %d\n", sock);
-
    this->sock = sock;
 
    if ((ssl = SSL_new(tlsctx)) == NULL) {
@@ -255,25 +208,6 @@ bool SSLTCPSocket::setFD(SOCKET sock) {
    }
 
    return true;
-}
-
-bool SSLTCPSocket::setNoBlock() {
-   int ret = -1;
-   int flags;
-
-   if (sock >= 0) {
-      flags = fcntl(sock, F_GETFL, 0);
-      ret = fcntl(sock, F_SETFL, flags | O_NONBLOCK);
-
-      if (ret < 0) {
-         perror("fcntl failed...");
-      }
-   }
-   else {
-      printf("Socket isn't initialized!\n");
-   }
-
-   return ret != -1;
 }
 
 int SSLTCPSocket::write(LPVOID data, int buf_sz) {

@@ -282,7 +282,6 @@ public:
 void ApplicationServer::start() {
    PrintNekoBadge();
    CreateThreadM(ServerThread, this);
-   while(!this->isRunning());
 }
 
 void ApplicationServer::stop() {
@@ -301,7 +300,6 @@ ApplicationServer::ApplicationServer(HTTPProtocol type, char* appName, char* por
    this->type = type;
 
    strcpy(this->appName, appName);
-   this->status = STOPPED;
 
    if (port == NULL) {
       switch(type) {
@@ -316,6 +314,8 @@ ApplicationServer::ApplicationServer(HTTPProtocol type, char* appName, char* por
    }
    else
       strcpy(this->port, port); 
+
+   this->status = STOPPED;
 
    nGetServices = nPutServices = nPostServices = nDeleteServices = 0;
 }
@@ -465,34 +465,22 @@ void* SocketThread(void* lpargs) {
    printf("Consuming HTTP header...\n");
    while (reading) {
       nBytes = client->readLine(buffer, 1024);
-      //End of HTTP header
-      if (nBytes > 0 && nBytes <= 2) {
-         printf("END OF HTTP HEADER!\n");
+      if (nBytes > 0 && nBytes <= 2)
          break;
-      }
-      //Socket open, but no data
-      else if (nBytes < 0 && client->wouldBlock()) {
-         //Implement a timeout here.
-
+      else if (nBytes < 0 && client->wouldBlock())
          continue;
-      }
-      //Socket closed
-      else if (nBytes < 0 && !client->wouldBlock()) {
-         printf("READ FAILED!\n");
+      else {
          client->close();
          ExitThreadM(0);
       }
-      //Data available to read
-      else {
-         buffer[nBytes - 2] = 0;
-         printf("HEADER: %s\n", buffer);
-         header.consumeLine(buffer);
 
-         if (header.isMalformed()) {
-            printf("MALFORMED HTTP HEADER!\n");
-            client->close();
-            ExitThreadM(0);
-         }
+      buffer[nBytes - 2] = 0;
+      printf("HEADER: %s\n", buffer);
+      header.consumeLine(buffer);
+
+      if (header.isMalformed()) {
+         client->close();
+         ExitThreadM(0);
       }
    }
 
