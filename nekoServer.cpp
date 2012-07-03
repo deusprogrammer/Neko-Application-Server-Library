@@ -93,15 +93,20 @@ ApplicationServer::ApplicationServer() {
    type = HTTP;
    strcpy(this->appName, "NekoServer");
    strcpy(this->port, "80");
+   this->nConnections = 0;
+   this->maxConnections = 10;
    this->status = STOPPED;
    nGetServices = nPutServices = nPostServices = nDeleteServices = 0;
 }
 
-ApplicationServer::ApplicationServer(HTTPProtocol type, char* appName, char* port) {
+ApplicationServer::ApplicationServer(HTTPProtocol type, char* appName, int maxConnections, char* port) {
    this->type = type;
 
    strcpy(this->appName, appName);
    this->status = STOPPED;
+
+   this->nConnections = 0;
+   this->maxConnections = maxConnections;
 
    if (port == NULL) {
       switch(type) {
@@ -117,6 +122,9 @@ ApplicationServer::ApplicationServer(HTTPProtocol type, char* appName, char* por
       strcpy(this->port, port); 
 
    nGetServices = nPutServices = nPostServices = nDeleteServices = 0;
+}
+
+ApplicationServer::~ApplicationServer() {
 }
 
 void ApplicationServer::addService(HTTPVerb verb, char* resourceName, void *(*funcPtr)(Socket*, HTTPHeaderObject*, void*)) {
@@ -209,6 +217,11 @@ void* ServerThread(void* lpargs) {
       char* connectedIP = GetIPAddressString(GetConnectedIP(&client));
       printf("Connection from %s\n", connectedIP);
 
+      if (appServer->getAvailableConnections() <= 0) {
+         CloseSocket(client);
+         continue;
+      }
+
       switch (appServer->getType()) {
       case HTTP:
          tsocket = new TCPSocket();
@@ -228,6 +241,7 @@ void* ServerThread(void* lpargs) {
 
       appArgs->appServer = appServer;
       appArgs->sock = tsocket;
+      appServer->incrementConnectionCount();
          
       CreateThreadM(SocketThread, (LPVOID)appArgs);
    }
@@ -328,6 +342,8 @@ void* SocketThread(void* lpargs) {
    printf("Cleaning up...\n", header.getRequest()->getResource());
    if (data)
       delete data;
+
+   appServer->decrementConnectionCount();
 
    printf("Exiting thread...\n\n");
    ExitThreadM(0);

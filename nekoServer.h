@@ -154,7 +154,7 @@ struct ApplicationServerArgs;
 class ApplicationServer;
 
 struct WebService {
-   char resourceName[1024];
+   char resourceName[128];
    void *(*callback)(Socket*, HTTPHeaderObject*, void*);
 };
 
@@ -169,6 +169,9 @@ protected:
    AppServerStatus status;
    char appName[32];
    char port[8];
+   int maxConnections;
+   int nConnections;
+
    WebService getServices[128];
    WebService putServices[128];
    WebService postServices[128];
@@ -180,10 +183,14 @@ protected:
 public:
    ApplicationServer();
    ~ApplicationServer();
-   ApplicationServer(HTTPProtocol type, char* appName = "NekoServer", char* port = NULL);
+   ApplicationServer(HTTPProtocol type, char* appName = "NekoServer", int maxConnections = 1000, char* port = NULL);
    void addService(HTTPVerb verb, char* resourceName, void *(*funcPtr)(Socket*, HTTPHeaderObject*, void*));
    void start();
    void stop();
+
+   void incrementConnectionCount() {nConnections++;}
+   void decrementConnectionCount() {nConnections--;}
+   int getAvailableConnections() {return maxConnections - nConnections;}
 
    AppServerStatus getStatus() {return status;}
    void setStatus(AppServerStatus status) {this->status = status;}
