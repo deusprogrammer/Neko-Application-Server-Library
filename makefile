@@ -20,7 +20,7 @@ timer.o: timer.cpp
 strutils.o: strutils.cpp
 	$(GXX) $(FLAGS) strutils.cpp
 
-neko.a: nekoServer.o simSock.o thread.o strutils.o
+neko.a: nekoServer.o simSock.o thread.o strutils.o timer.o
 	$(AR) neko.a *.o
 
 clean:

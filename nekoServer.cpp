@@ -231,6 +231,8 @@ void* ServerThread(void* lpargs) {
          break;
       };
 
+      //SetSocketNoBlock(client);
+
       if(!tsocket->setFD(client)) {
          CloseSocket(client);
          continue;
@@ -281,8 +283,8 @@ void* SocketThread(void* lpargs) {
    while (reading) {
       nBytes = client->readLine(buffer, 1024);
       //End of HTTP header
-      if (nBytes > 0 && nBytes <= 2) {
-         printf("END OF HTTP HEADER!\n");
+      if (nBytes >= 0 && nBytes <= 2) {
+         printf("END OF HTTP HEADER (nBytes=%d)!\n", nBytes);
          break;
       }
       //Socket open, but no data
@@ -348,4 +350,3 @@ void* SocketThread(void* lpargs) {
    printf("Exiting thread...\n\n");
    ExitThreadM(0);
 }
-

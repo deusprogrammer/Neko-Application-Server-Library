@@ -134,7 +134,7 @@ int SSLTCPSocket::write(LPVOID data, int buf_sz) {
 
 int SSLTCPSocket::read(LPVOID data, int buf_sz) {
    //printf("IN SSLTCPSocket::read()\n");
-   return SSL_read(ssl, data, buf_sz);
+   return (this->sslError = SSL_read(ssl, data, buf_sz));
 }
 
 int SSLTCPSocket::readLine(LPVOID data, int buf_sz) {
@@ -150,8 +150,10 @@ int SSLTCPSocket::readLine(LPVOID data, int buf_sz) {
       i++;
    }while(c[0] != '\n' && i < buf_sz && result > 0);
 
-   if(!result > 0)
+   if(result <= 0) {
+      this->sslError = result;
       return -1;
+   }
    else
       return i;
 }
@@ -494,7 +496,7 @@ int ReadLineSocket(SOCKET sock, LPVOID data, int buf_sz) {
       i++;
    }while(c[0] != '\n' && i < buf_sz && result > 0);
 
-   if(!result > 0)
+   if(result <= 0)
       return -1;
    else
       return i;
@@ -520,4 +522,10 @@ char* GetIPAddressString(unsigned long ip) {
    sprintf(ipString, "%d.%d.%d.%d", address->octet[0], address->octet[1], address->octet[2], address->octet[3]);
 
    return ipString;
+}
+
+bool SetSocketNoBlock(SOCKET sock) {
+   int flags = fcntl(sock, F_GETFL, 0);
+   return fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+
 }

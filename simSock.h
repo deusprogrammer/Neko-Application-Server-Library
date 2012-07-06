@@ -84,6 +84,7 @@ int WriteSocket(SOCKET sock, LPVOID data, int buf_sz);
 int WriteSocket(SOCKET sock, LPVOID data);
 int ReadSocket(SOCKET sock, LPVOID data, int buf_sz);
 int ReadLineSocket(SOCKET sock, LPVOID data, int buf_sz);
+bool SetSocketNoBlock(SOCKET sock);
 
 unsigned long GetConnectedIP(SOCKET *pSock);
 char* GetIPAddressString(unsigned long ip);
@@ -127,13 +128,14 @@ class SSLTCPSocket: public Socket {
 private:
    SSL* ssl;
    SSL_CTX *tlsctx;
+   int sslError;
 public:
    SSLTCPSocket();
    ~SSLTCPSocket();
 
    bool setFD(SOCKET sock);
    bool setNoBlock();
-   bool wouldBlock() {return errno == EWOULDBLOCK;}
+   bool wouldBlock() {return SSL_get_error(ssl, sslError) == SSL_ERROR_WANT_READ;}
    int getError() {return errno;}
 
    int write(LPVOID data, int buf_sz);
