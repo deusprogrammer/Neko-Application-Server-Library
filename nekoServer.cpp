@@ -325,7 +325,13 @@ void* SocketThread(void* lpargs) {
       data = new char[header.getContentLength()];
 
       printf("Reading %d bytes of data...\n", header.getContentLength());
-      nBytes = client->readLine(data, header.getContentLength());
+      int nBytes = 0;
+      do {
+         nBytes = client->readLine(data, header.getContentLength());
+         printf("\tRead %d bytes.\n", nBytes);
+         if (client->wouldBlock())
+            printf("\tClient would block.\n");
+      } while (nBytes <= 0 && client->wouldBlock());
       data[nBytes] = 0;
    }
 
