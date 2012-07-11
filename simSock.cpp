@@ -57,18 +57,27 @@ void TCPSocket::close() {
    return CloseSocket(sock);
 }
 
-SSLTCPSocket::SSLTCPSocket() {
+SSLTCPSocket::SSLTCPSocket(int endPoint) {
    sock = -1; 
    ssl = NULL;
+   this->endPoint = endPoint;
 
    SSL_load_error_strings();
    SSL_library_init();
    OpenSSL_add_all_algorithms();
 
-   tlsctx = SSL_CTX_new(TLSv1_server_method());
-   SSL_CTX_set_options(tlsctx, SSL_OP_SINGLE_DH_USE);
-   SSL_CTX_use_certificate_file(tlsctx, "server.crt" , SSL_FILETYPE_PEM);
-   SSL_CTX_use_PrivateKey_file(tlsctx, "server.key", SSL_FILETYPE_PEM);
+   switch (this->endPoint) {
+   case CLIENT:
+      tlsctx = SSL_CTX_new(SSLv23_client_method());
+      break;
+   case SERVER:
+   default:
+      tlsctx = SSL_CTX_new(SSLv23_server_method());
+      SSL_CTX_set_options(tlsctx, SSL_OP_SINGLE_DH_USE);
+      SSL_CTX_use_certificate_file(tlsctx, "server.crt" , SSL_FILETYPE_PEM);
+      SSL_CTX_use_PrivateKey_file(tlsctx, "server.key", SSL_FILETYPE_PEM);
+      break;
+   };
 }
 
 SSLTCPSocket::~SSLTCPSocket() {
@@ -97,13 +106,25 @@ bool SSLTCPSocket::setFD(SOCKET sock) {
       return false;
    }
 
-   if (SSL_accept(ssl) <= 0) {
-      fprintf(stderr, "SSL_accept failed!\n");
+   switch(endPoint) {
+   case CLIENT:
+      if (SSL_connect(ssl) <= 0) {
+         SSL_shutdown(ssl);
+         SSL_free(ssl);
+         return false;
+      }
+      break;
+   case SERVER:
+   default:
+      if (SSL_accept(ssl) <= 0) {
+         fprintf(stderr, "SSL_accept failed!\n");
 
-      SSL_shutdown(ssl);
-      SSL_free(ssl);
-      return false;
-   }
+         SSL_shutdown(ssl);
+         SSL_free(ssl);
+         return false;
+      }
+      break;
+   };
 
    return true;
 }

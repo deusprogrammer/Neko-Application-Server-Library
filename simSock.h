@@ -42,6 +42,9 @@
 #define IPV4 AF_INET
 #define IPV6 AF_INET6
 
+#define SERVER 0
+#define CLIENT 1
+
 #ifdef _WIN32
 
 #define socklen_t unsigned int
@@ -93,8 +96,9 @@ class Socket {
 protected:
    SOCKET sock;
    int error;
+   int endPoint;
 public:
-   Socket() {sock = -1;}
+   Socket(int endPoint = SERVER) {sock = -1; this->endPoint = endPoint;}
    ~Socket() {}
    virtual bool setFD(SOCKET sock) {this->sock = sock; return true;}
    virtual bool setNoBlock();
@@ -111,9 +115,9 @@ class TCPSocket: public Socket {
 protected:
    SOCKET sock;
 public:
-   TCPSocket() {sock = -1;}
+   TCPSocket(int endPoint = SERVER) {sock = -1; this->endPoint = endPoint;}
    ~TCPSocket() {}
-   bool setFD(SOCKET sock) {printf("SET FD TO %d\n", sock); this->sock = sock; return true;}
+   bool setFD(SOCKET sock, int endPoint = SERVER) {printf("SET FD TO %d\n", sock); this->sock = sock; return true;}
    bool setNoBlock();
    bool wouldBlock() {return errno == EWOULDBLOCK;}
    int getError() {return errno;}
@@ -130,7 +134,7 @@ private:
    SSL_CTX *tlsctx;
    int sslError;
 public:
-   SSLTCPSocket();
+   SSLTCPSocket(int endPoint = SERVER);
    ~SSLTCPSocket();
 
    bool setFD(SOCKET sock);
