@@ -42,8 +42,9 @@
 #define IPV4 AF_INET
 #define IPV6 AF_INET6
 
-#define SERVER 0
-#define CLIENT 1
+#define SERVER    0
+#define CLIENT    1
+#define LISTENER  2
 
 #ifdef _WIN32
 
@@ -105,6 +106,11 @@ public:
    virtual bool wouldBlock() {return errno == EWOULDBLOCK;}
    virtual int getError() {return errno;}
 
+   virtual bool connect(char* hostname, char* port) {};
+
+   virtual bool bind(char* port) {};
+   virtual Socket* accept() {};
+
    virtual int write(LPVOID data, int buf_sz) {}
    virtual int read(LPVOID data, int buf_sz) {}
    virtual int readLine(LPVOID data, int buf_sz) {}
@@ -121,6 +127,11 @@ public:
    bool setNoBlock();
    bool wouldBlock() {return errno == EWOULDBLOCK;}
    int getError() {return errno;}
+
+   bool connect(char* hostname, char* port);
+
+   bool bind(char* port);
+   Socket* accept();
 
    int write(LPVOID data, int buf_sz);
    int read(LPVOID data, int buf_sz);
@@ -141,6 +152,11 @@ public:
    bool setNoBlock();
    bool wouldBlock() {return SSL_get_error(ssl, sslError) == SSL_ERROR_WANT_READ;}
    int getError() {return errno;}
+
+   bool connect(char* hostname, char* port);
+
+   bool bind(char* port);
+   Socket* accept();
 
    int write(LPVOID data, int buf_sz);
    int read(LPVOID data, int buf_sz);

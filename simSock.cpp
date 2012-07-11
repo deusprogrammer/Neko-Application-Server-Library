@@ -38,17 +38,67 @@ bool TCPSocket::setNoBlock() {
    return ret != -1;
 }
 
+bool TCPSocket::connect(char* hostname, char* port) {
+   if (endPoint != CLIENT)
+      return false;
+
+   SOCKET client;
+
+   if (OpenClientSocket(&client, hostname, port, IPV4, TCP) == -1)
+      return false;
+
+   this->setFD(client);
+}
+
+bool TCPSocket::bind(char* port) {
+   if (endPoint != LISTENER)
+      return false;
+
+   SOCKET server;
+
+   if (OpenServerSocket(&server, port, IPV4, TCP) == -1)
+      return false;
+
+   this->sock = server;
+}
+
+Socket* TCPSocket::accept() {
+   if (endPoint != LISTENER)
+      return NULL;
+
+   SOCKET client;
+
+   client = AcceptConnection(sock);
+
+   if (client == -1)
+      return NULL;
+
+   TCPSocket* tcpClient = new TCPSocket(SERVER);
+   tcpClient->setFD(client);
+
+   return tcpClient;
+}
+
 int TCPSocket::write(LPVOID data, int buf_sz) {
+   if (LISTENER)
+      return -1;
+
    //printf("IN TCPSocket::write()\n");
    return WriteSocket(sock, data, buf_sz);
 }
 
 int TCPSocket::read(LPVOID data, int buf_sz) {
+   if (LISTENER)
+      return -1;
+
    //printf("IN TCPSocket::read()\n");
    return ReadSocket(sock, data, buf_sz);
 }
 
 int TCPSocket::readLine(LPVOID data, int buf_sz) {
+   if (LISTENER)
+      return -1;
+
    //printf("IN TCPSocket::readLine()\n");
    return ReadLineSocket(sock, data, buf_sz);
 }
@@ -69,6 +119,8 @@ SSLTCPSocket::SSLTCPSocket(int endPoint) {
    switch (this->endPoint) {
    case CLIENT:
       tlsctx = SSL_CTX_new(SSLv23_client_method());
+      break;
+   case LISTENER:
       break;
    case SERVER:
    default:
@@ -114,6 +166,8 @@ bool SSLTCPSocket::setFD(SOCKET sock) {
          return false;
       }
       break;
+   case LISTENER:
+      break;
    case SERVER:
    default:
       if (SSL_accept(ssl) <= 0) {
@@ -148,17 +202,67 @@ bool SSLTCPSocket::setNoBlock() {
    return ret != -1;
 }
 
+bool SSLTCPSocket::connect(char* hostname, char* port) {
+   if (endPoint != CLIENT)
+      return false;
+
+   SOCKET client;
+
+   if (OpenClientSocket(&client, hostname, port, IPV4, TCP) == -1)
+      return false;
+
+   this->setFD(client);
+}
+
+bool SSLTCPSocket::bind(char* port) {
+   if (endPoint != LISTENER)
+      return false;
+
+   SOCKET server;
+
+   if (OpenServerSocket(&server, port, IPV4, TCP) == -1)
+      return false;
+
+   this->sock = server;
+}
+
+Socket* SSLTCPSocket::accept() {
+   if (endPoint != LISTENER)
+      return NULL;
+
+   SOCKET client;
+
+   client = AcceptConnection(sock);
+
+   if (client == -1)
+      return NULL;
+
+   SSLTCPSocket* sslClient = new SSLTCPSocket(SERVER);
+   sslClient->setFD(client);
+
+   return sslClient;
+}
+
 int SSLTCPSocket::write(LPVOID data, int buf_sz) {
+   if (endPoint == LISTENER)
+      return -1;
+
    //printf("IN SSLTCPSocket::write()\n");
    return SSL_write(ssl, data, buf_sz);
 }
 
 int SSLTCPSocket::read(LPVOID data, int buf_sz) {
+   if (endPoint == LISTENER)
+      return -1;
+
    //printf("IN SSLTCPSocket::read()\n");
    return (this->sslError = SSL_read(ssl, data, buf_sz));
 }
 
 int SSLTCPSocket::readLine(LPVOID data, int buf_sz) {
+   if (endPoint == LISTENER)
+      return -1;
+
    //printf("IN SSLTCPSocket::readline()\n");
 
    int i = 0;

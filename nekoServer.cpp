@@ -201,27 +201,49 @@ void* ServerThread(void* lpargs) {
    InitializeWS();
    #endif
 
-   //Open server socket, type can be either TCP or UDP...this example uses TCP
-   if (OpenServerSocket(&server, port, IPV4, TCP) == -1) {
-      appServer->stop();
-      ExitThreadM(0);
-   }
+   //EXPERIMENTAL BLOCK
+   Socket* listener;
+   switch (appServer->getType()) {
+   case HTTP:
+      listener = new TCPSocket(LISTENER);
+      break;
+   case HTTPS:
+      listener = new SSLTCPSocket(LISTENER);
+      break;
+   };   
+
+   //Open server socket
+   //if (OpenServerSocket(&server, port, IPV4, TCP) == -1) {
+   //   appServer->stop();
+   //   ExitThreadM(0);
+   //}
+
+   //EXPERIMENTAL BLOCK
+   listener->bind(port);
 
    printf("%s listening on port %s...\n", appServer->getAppName(), appServer->getPort());
 
    if (appServer->getType() == HTTPS)
       printf("Using %s\n", SSLeay_version(SSLEAY_VERSION));
 
+   //EXPERIMENTAL BLOCK
+   Socket* eClient;
+
    //Start an accept connection loop
-   while((client = AcceptConnection(server)) && appServer->getStatus() == RUNNING) {
-      char* connectedIP = GetIPAddressString(GetConnectedIP(&client));
-      printf("Connection from %s\n", connectedIP);
+   //while((client = AcceptConnection(server)) && appServer->getStatus() == RUNNING) {
+
+   //EXPERIMENTAL BLOCK
+   while ((eClient = listener->accept()) && appServer->getStatus() == RUNNING) {
+      //char* connectedIP = GetIPAddressString(GetConnectedIP(&client));
+      //printf("Connection from %s\n", connectedIP);
 
       if (appServer->getAvailableConnections() <= 0) {
-         CloseSocket(client);
+         eClient->close();
+         //CloseSocket(client);
          continue;
       }
 
+      /*
       switch (appServer->getType()) {
       case HTTP:
          tsocket = new TCPSocket();
@@ -230,19 +252,21 @@ void* ServerThread(void* lpargs) {
          tsocket = new SSLTCPSocket();
          break;
       };
+      */
 
-      //SetSocketNoBlock(client);
-
+      /*
       if(!tsocket->setFD(client)) {
          CloseSocket(client);
          continue;
       }
+      */
             
 
       appArgs = new ApplicationServerArgs();
 
       appArgs->appServer = appServer;
-      appArgs->sock = tsocket;
+      //appArgs->sock = tsocket;
+      appArgs->sock = eClient;
       appServer->incrementConnectionCount();
          
       CreateThreadM(SocketThread, (LPVOID)appArgs);
