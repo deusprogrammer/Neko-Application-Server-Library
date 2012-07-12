@@ -105,6 +105,7 @@ public:
    virtual bool setNoBlock();
    virtual bool wouldBlock() {return errno == EWOULDBLOCK;}
    virtual int getError() {return errno;}
+   bool wasError() {return error == -1;}
 
    virtual bool connect(char* hostname, char* port) {};
 

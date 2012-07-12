@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "simSock.h"
 #include "strutils.h"
@@ -169,6 +171,7 @@ protected:
    AppServerStatus status;
    char appName[32];
    char port[8];
+   char htdocsDirectory[1024];
    int maxConnections;
    int nConnections;
 
@@ -194,6 +197,8 @@ public:
 
    AppServerStatus getStatus() {return status;}
    void setStatus(AppServerStatus status) {this->status = status;}
+   void setHtdocsDirectory(char* htdocsDirectory);
+   char* getHtdocsDirectory();
    char* getPort() {return port;}
    char* getAppName() {return appName;}
    HTTPProtocol getType() {return type;}

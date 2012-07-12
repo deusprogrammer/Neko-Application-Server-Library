@@ -96,7 +96,10 @@ ApplicationServer::ApplicationServer() {
    this->nConnections = 0;
    this->maxConnections = 10;
    this->status = STOPPED;
+   strcpy(this->htdocsDirectory, "htdocs");
    nGetServices = nPutServices = nPostServices = nDeleteServices = 0;
+
+   mkdir("./htdocs/", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 }
 
 ApplicationServer::ApplicationServer(HTTPProtocol type, char* appName, int maxConnections, char* port) {
@@ -107,6 +110,7 @@ ApplicationServer::ApplicationServer(HTTPProtocol type, char* appName, int maxCo
 
    this->nConnections = 0;
    this->maxConnections = maxConnections;
+   strcpy(this->htdocsDirectory, "htdocs");
 
    if (port == NULL) {
       switch(type) {
@@ -184,6 +188,17 @@ WebService* ApplicationServer::fetchService(HTTPVerb verb, char* resourceName) {
    return NULL;
 }
 
+void ApplicationServer::setHtdocsDirectory(char* htdocsDirectory) {
+   strcpy(this->htdocsDirectory, htdocsDirectory);
+}
+
+char* ApplicationServer::getHtdocsDirectory() {
+   if (!htdocsDirectory)
+      return "htdocs";
+   else
+      return htdocsDirectory;
+}
+
 #ifdef _WIN32
 DWORD WINAPI ServerThread(LPVOID lpargs) {
 #else
@@ -237,7 +252,7 @@ void* ServerThread(void* lpargs) {
       //char* connectedIP = GetIPAddressString(GetConnectedIP(&client));
       //printf("Connection from %s\n", connectedIP);
 
-      if (appServer->getAvailableConnections() <= 0) {
+      if (appServer->getAvailableConnections() <= 0 || eClient->wasError()) {
          eClient->close();
          //CloseSocket(client);
          continue;
@@ -366,9 +381,33 @@ void* SocketThread(void* lpargs) {
       webService->callback(client, &header, data);
    }
    else {
-      fprintf(stderr, "\tUnable to find %s!\n", header.getRequest()->getResource());
-      client->write((void*)HTTP_404, sizeof(HTTP_404) - 1);
-      client->close();
+      char path[1024];
+      sprintf(path, "%s/%s", appServer->getHtdocsDirectory(), header.getRequest()->getResource());
+      FILE* fp = fopen(path, "rb");
+      
+      if (!fp) {
+         fprintf(stderr, "\tUnable to find %s!\n", header.getRequest()->getResource());
+         client->write((void*)HTTP_404, sizeof(HTTP_404) - 1);
+         client->close();
+      }
+      else {
+         fseek(fp, 0, SEEK_END);
+         int size = ftell(fp);
+         fseek(fp, 0, SEEK_SET);
+
+         char httpHeader[1024];
+         char buffer[1024];
+         int nBytes = 0;
+         sprintf(httpHeader, "HTTP/1.1 200 Okay\r\nContent-Length:%d\r\n\r\n", size);
+
+         client->write(httpHeader, strlen(httpHeader));
+         while ((nBytes = fread(buffer, 1, 1024, fp)) > 0) {
+            buffer[nBytes] = 0;
+            client->write(buffer, nBytes);
+         }
+
+         client->close();
+      }
    }
 
    printf("Cleaning up...\n", header.getRequest()->getResource());

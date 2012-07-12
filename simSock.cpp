@@ -158,6 +158,8 @@ bool SSLTCPSocket::setFD(SOCKET sock) {
       return false;
    }
 
+   int ret;
+
    switch(endPoint) {
    case CLIENT:
       if (SSL_connect(ssl) <= 0) {
@@ -170,8 +172,11 @@ bool SSLTCPSocket::setFD(SOCKET sock) {
       break;
    case SERVER:
    default:
-      if (SSL_accept(ssl) <= 0) {
+      if ((ret = SSL_accept(ssl)) <= 0) {
          fprintf(stderr, "SSL_accept failed!\n");
+         ERR_print_errors_fp(stderr);
+
+         this->error = -1;
 
          SSL_shutdown(ssl);
          SSL_free(ssl);
