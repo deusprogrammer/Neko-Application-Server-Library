@@ -1,3 +1,6 @@
+#ifndef NEKOSERVER_H
+#define NEKOSERVER_H
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -5,13 +8,18 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <map>
+#include <list>
+#include <string>
+#include <utility>
+#include <iostream>
+
 #include "simSock.h"
 #include "strutils.h"
 #include "thread.h"
 #include "timer.h"
 
-#ifndef NEKOSERVER_H
-#define NEKOSERVER_H
+using namespace std;
 
 #ifndef SOCKET
 #define SOCKET int
@@ -142,12 +150,15 @@ class HTTPHeaderObject {
 private:
    HTTPRequest httpRequest;
    unsigned int contentLength;
+   map<string, string> headerInfo;
+
    bool malformed;
 public:
    HTTPHeaderObject() {contentLength = 0; malformed = true;}
    void consumeLine(char* line);
    bool isMalformed() {return malformed;}
    int getContentLength() {return contentLength;}
+   string getHeaderLine(string lineLabel) {return headerInfo[lineLabel];}
    HTTPRequest* getRequest() {return &httpRequest;}
 };
 
@@ -158,6 +169,8 @@ class ApplicationServer;
 struct WebService {
    char resourceName[128];
    void *(*callback)(Socket*, HTTPHeaderObject*, void*);
+
+   WebService(void *(*callback)(Socket*, HTTPHeaderObject*, void*));
 };
 
 struct ApplicationServerArgs {
@@ -175,10 +188,18 @@ protected:
    int maxConnections;
    int nConnections;
 
+   /*
    WebService getServices[128];
    WebService putServices[128];
    WebService postServices[128];
    WebService deleteServices[128];
+   */
+
+   map<string, WebService*> getServices;
+   map<string, WebService*> putServices;
+   map<string, WebService*> postServices;
+   map<string, WebService*> deleteServices;
+
    int nGetServices;
    int nPutServices;
    int nPostServices;

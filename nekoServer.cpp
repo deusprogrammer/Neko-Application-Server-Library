@@ -74,9 +74,16 @@ void HTTPHeaderObject::consumeLine(char* line) {
    else if (stringEquals(tokens[0], "Content-Length")) {
       contentLength = stringToInt(tokens[1]);
    }
-   //More header items to come
+   else {
+      //Need to have a function that can concatenate tokens 1-n back into a string.
+      headerInfo[tokens[0]] = tokens[1];
+   }
 
    free(tokens);
+}
+
+WebService::WebService(void *(*funcPtr)(Socket*, HTTPHeaderObject*, void*)) {
+   this->callback = funcPtr;
 }
 
 void ApplicationServer::start() {
@@ -134,58 +141,69 @@ ApplicationServer::~ApplicationServer() {
 void ApplicationServer::addService(HTTPVerb verb, char* resourceName, void *(*funcPtr)(Socket*, HTTPHeaderObject*, void*)) {
    switch(verb) {
    case GET:
-      getServices[nGetServices].callback = funcPtr;
-      strcpy(getServices[nGetServices++].resourceName, resourceName);      
+      //getServices[nGetServices].callback = funcPtr;
+      //strcpy(getServices[nGetServices++].resourceName, resourceName);
+      getServices[resourceName] = new WebService(funcPtr);
       break;
    case PUT:
-      putServices[nPutServices].callback = funcPtr;
-      strcpy(putServices[nPutServices++].resourceName, resourceName);      
+      //putServices[nPutServices].callback = funcPtr;
+      //strcpy(putServices[nPutServices++].resourceName, resourceName);
+      putServices[resourceName] = new WebService(funcPtr);
       break;
    case POST:
-      postServices[nPostServices].callback = funcPtr;
-      strcpy(postServices[nPostServices++].resourceName, resourceName);      
+      //postServices[nPostServices].callback = funcPtr;
+      //strcpy(postServices[nPostServices++].resourceName, resourceName);      
+      postServices[resourceName] = new WebService(funcPtr);
       break;
    case DELETE:
-      deleteServices[nDeleteServices].callback = funcPtr;
-      strcpy(deleteServices[nDeleteServices++].resourceName, resourceName);      
+      //deleteServices[nDeleteServices].callback = funcPtr;
+      //strcpy(deleteServices[nDeleteServices++].resourceName, resourceName);      
+      deleteServices[resourceName] = new WebService(funcPtr);
       break;
    }
 }
 
 WebService* ApplicationServer::fetchService(HTTPVerb verb, char* resourceName) {
-   int nServices;
-   WebService* services;
+   //int nServices;
+   //WebService* services;
 
    switch(verb) {
    case GET:
-      nServices = nGetServices;
-      services = getServices;
-      break;
+      //nServices = nGetServices;
+      //services = getServices;
+      return getServices[resourceName];      
+      //break;
    case PUT:
-      nServices = nPutServices;
-      services = putServices;
-      break;
+      //nServices = nPutServices;
+      //services = putServices;
+      return putServices[resourceName];      
+      //break;
    case POST:
-      nServices = nPostServices;
-      services = postServices;
-      break;
+      //nServices = nPostServices;
+      //services = postServices;
+      return postServices[resourceName];      
+      //break;
    case DELETE:
-      nServices = nDeleteServices;
-      services = deleteServices;
-      break;
+      //nServices = nDeleteServices;
+      //services = deleteServices;
+      return deleteServices[resourceName];      
+      //break;
    default:
-      nServices = nGetServices;
-      services = getServices;
-      break;
+      //nServices = nGetServices;
+      //services = getServices;
+      return getServices[resourceName];      
+      //break;
    }
 
+   /*
    for (int i = 0; i < nServices; i++) {
       if (stringEquals(services[i].resourceName, resourceName)) {
          return &services[i];
       }
    }
+   */
 
-   return NULL;
+   //return NULL;
 }
 
 void ApplicationServer::setHtdocsDirectory(char* htdocsDirectory) {
@@ -216,7 +234,6 @@ void* ServerThread(void* lpargs) {
    InitializeWS();
    #endif
 
-   //EXPERIMENTAL BLOCK
    Socket* listener;
    switch (appServer->getType()) {
    case HTTP:
@@ -227,13 +244,6 @@ void* ServerThread(void* lpargs) {
       break;
    };   
 
-   //Open server socket
-   //if (OpenServerSocket(&server, port, IPV4, TCP) == -1) {
-   //   appServer->stop();
-   //   ExitThreadM(0);
-   //}
-
-   //EXPERIMENTAL BLOCK
    listener->bind(port);
 
    printf("%s listening on port %s...\n", appServer->getAppName(), appServer->getPort());
@@ -241,46 +251,17 @@ void* ServerThread(void* lpargs) {
    if (appServer->getType() == HTTPS)
       printf("Using %s\n", SSLeay_version(SSLEAY_VERSION));
 
-   //EXPERIMENTAL BLOCK
    Socket* eClient;
 
-   //Start an accept connection loop
-   //while((client = AcceptConnection(server)) && appServer->getStatus() == RUNNING) {
-
-   //EXPERIMENTAL BLOCK
    while ((eClient = listener->accept()) && appServer->getStatus() == RUNNING) {
-      //char* connectedIP = GetIPAddressString(GetConnectedIP(&client));
-      //printf("Connection from %s\n", connectedIP);
-
       if (appServer->getAvailableConnections() <= 0 || eClient->wasError()) {
          eClient->close();
-         //CloseSocket(client);
          continue;
       }
-
-      /*
-      switch (appServer->getType()) {
-      case HTTP:
-         tsocket = new TCPSocket();
-         break;
-      case HTTPS:
-         tsocket = new SSLTCPSocket();
-         break;
-      };
-      */
-
-      /*
-      if(!tsocket->setFD(client)) {
-         CloseSocket(client);
-         continue;
-      }
-      */
-            
 
       appArgs = new ApplicationServerArgs();
 
       appArgs->appServer = appServer;
-      //appArgs->sock = tsocket;
       appArgs->sock = eClient;
       appServer->incrementConnectionCount();
          
