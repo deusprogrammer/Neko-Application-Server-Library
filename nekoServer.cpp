@@ -9,22 +9,6 @@ void PrintNekoBadge() {
    printf("%s\n\n", NYAN1);
 }
 
-void HTTPQueryString::add(char* key, char* value) {
-   if (nPairs < 64) {
-      stringCopy(pairs[nPairs].key, key);
-      stringCopy(pairs[nPairs++].value, value);
-   }
-}
-
-char* HTTPQueryString::operator[](char* key) {
-   for (int i = 0; i < nPairs; i++) {
-      if (stringEquals(pairs[i].key, key))
-         return pairs[i].value;
-   }
-
-   return NULL;
-}
-
 void HTTPRequest::init(char* cVerb, char** tokens, int nTokens) {
    if (nTokens < 2)
       return;
@@ -47,9 +31,8 @@ void HTTPRequest::init(char* cVerb, char** tokens, int nTokens) {
             int nElements;
             char** qElements = stringSplit(qTokens[i], "=", &nElements);
 
-            if (nElements == 2) {
-               queryString.add(qElements[0], qElements[1]);
-            }
+            if (nElements == 2)
+               queryStringMap[qElements[0]] = qElements[1];
 
             free(qElements);
          }
@@ -94,28 +77,6 @@ void HTTPHeaderObject::consumeLine(char* line) {
 
       headerInfo[token] = p;
    }
-
-
-
-/*
-   int nTokens;
-
-   char** tokens = stringSplit(line, " :", &nTokens);
-   
-   if (stringEquals(tokens[0], "GET") || stringEquals(tokens[0], "PUT") || stringEquals(tokens[0], "POST") || stringEquals(tokens[0], "DELETE")) {
-      httpRequest.init(tokens, nTokens);
-      malformed = false;
-   }
-   else if (stringEquals(tokens[0], "Content-Length")) {
-      contentLength = stringToInt(tokens[1]);
-   }
-   else {
-      //Need to have a function that can concatenate tokens 1-n back into a string.
-      headerInfo[tokens[0]] = tokens[1];
-   }
-
-   free(tokens);
-*/
 }
 
 WebService::WebService(void *(*funcPtr)(Socket*, HTTPHeaderObject*, void*)) {

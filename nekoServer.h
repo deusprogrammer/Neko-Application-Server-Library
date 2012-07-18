@@ -117,33 +117,19 @@ enum HTTPProtocol {HTTP, HTTPS};
 enum HTTPVerb {GET, PUT, POST, DELETE};
 enum AppServerStatus {RUNNING, STOPPED, PAUSED};
 
-struct HTTPQueryPair {
-   char key[32], value[128];
-};
-
-class HTTPQueryString {
-private:
-   HTTPQueryPair pairs[64];
-   int nPairs;
-public:
-   HTTPQueryString() {nPairs = 0;}
-   ~HTTPQueryString() {}
-   void add(char* key, char* value);
-   char* operator[](char* key);
-};
-
 class HTTPRequest {
 private:
    HTTPVerb verb;
-   HTTPQueryString queryString;
+   map<string, string> queryStringMap;
    char resource[1024], httpVersion[64];
 public:
    HTTPRequest() {}
    void init(char* verb, char** tokens, int nTokens);
    HTTPVerb getVerb() {return verb;}
-   HTTPQueryString getQueryString() {return queryString;}
    char* getResource() {return resource;}
    char* getHTTPVersion() {return httpVersion;}
+   char* getQueryStringItem(char* key) {return (char*)queryStringMap[key].c_str();}
+   char* operator[](char* key) {return (char*)queryStringMap[key].c_str();}
 };
 
 class HTTPHeaderObject {
@@ -158,8 +144,8 @@ public:
    void consumeLine(char* line);
    bool isMalformed() {return malformed;}
    int getContentLength() {return contentLength;}
-   string getHeaderLine(string lineLabel) {return headerInfo[lineLabel];}
    HTTPRequest* getRequest() {return &httpRequest;}
+   char* operator[](char* key) {return (char*)headerInfo[key].c_str();}
 };
 
 struct WebService;
@@ -185,15 +171,8 @@ protected:
    char appName[32];
    char port[8];
    char htdocsDirectory[1024];
-   int maxConnections;
    int nConnections;
-
-   /*
-   WebService getServices[128];
-   WebService putServices[128];
-   WebService postServices[128];
-   WebService deleteServices[128];
-   */
+   int maxConnections;
 
    map<string, WebService*> getServices;
    map<string, WebService*> putServices;
