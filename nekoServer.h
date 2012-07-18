@@ -139,7 +139,7 @@ private:
    char resource[1024], httpVersion[64];
 public:
    HTTPRequest() {}
-   void init(char** tokens, int nTokens);
+   void init(char* verb, char** tokens, int nTokens);
    HTTPVerb getVerb() {return verb;}
    HTTPQueryString getQueryString() {return queryString;}
    char* getResource() {return resource;}

@@ -25,22 +25,22 @@ char* HTTPQueryString::operator[](char* key) {
    return NULL;
 }
 
-void HTTPRequest::init(char** tokens, int nTokens) {
-   if (nTokens < 3)
+void HTTPRequest::init(char* cVerb, char** tokens, int nTokens) {
+   if (nTokens < 2)
       return;
 
-   if (stringEquals(tokens[0], "GET"))
+   if (stringEquals(cVerb, "GET"))
       verb = GET;
-   else if (stringEquals(tokens[0], "PUT"))
+   else if (stringEquals(cVerb, "PUT"))
       verb = PUT;
-   else if (stringEquals(tokens[0], "POST"))
+   else if (stringEquals(cVerb, "POST"))
       verb = POST;
-   else if(stringEquals(tokens[0], "DELETE"))
+   else if(stringEquals(cVerb, "DELETE"))
       verb = DELETE;
 
-   if (stringContains(tokens[1], '?')) {
+   if (stringContains(tokens[0], '?')) {
       int nQTokens;
-      char** qTokens = stringSplit(tokens[1], "?&", &nQTokens);
+      char** qTokens = stringSplit(tokens[0], "?&", &nQTokens);
 
       for (int i = 0; i < nQTokens; i++) {
          if (stringContains(qTokens[i], '=')) {
@@ -58,11 +58,46 @@ void HTTPRequest::init(char** tokens, int nTokens) {
       free(qTokens);
    }
 
-   stringCopy(resource, tokens[1]);
-   stringCopy(httpVersion, tokens[2]);
+   stringCopy(resource, tokens[0]);
+   stringCopy(httpVersion, tokens[1]);
 }
 
 void HTTPHeaderObject::consumeLine(char* line) {
+   char* next;
+   char* token;
+   char *resource, *httpVersion;
+
+   token = strtok_r(line, ": ", &next);
+
+   if (strcmp(token, "GET") == 0 || strcmp(token, "PUT") == 0 || strcmp(token, "POST") == 0 || strcmp(token, "DELETE") == 0) {
+      int nTokens;
+      char** tokens;
+
+      tokens = stringSplit(next, " ", &nTokens);
+      resource = tokens[0];
+      httpVersion = tokens[1];
+
+      httpRequest.init(token, tokens, nTokens);
+      malformed = false;
+
+      delete tokens;
+   }
+   else if (stringEquals(token, "Content-Length")) {
+      char* p = next;
+      while (*p == ' ' && *p != 0) p++;
+
+      contentLength = stringToInt(p);
+   }
+   else {
+      char* p = next;
+      while (*p == ' ' && *p != 0) p++;
+
+      headerInfo[token] = p;
+   }
+
+
+
+/*
    int nTokens;
 
    char** tokens = stringSplit(line, " :", &nTokens);
@@ -80,6 +115,7 @@ void HTTPHeaderObject::consumeLine(char* line) {
    }
 
    free(tokens);
+*/
 }
 
 WebService::WebService(void *(*funcPtr)(Socket*, HTTPHeaderObject*, void*)) {
@@ -141,69 +177,33 @@ ApplicationServer::~ApplicationServer() {
 void ApplicationServer::addService(HTTPVerb verb, char* resourceName, void *(*funcPtr)(Socket*, HTTPHeaderObject*, void*)) {
    switch(verb) {
    case GET:
-      //getServices[nGetServices].callback = funcPtr;
-      //strcpy(getServices[nGetServices++].resourceName, resourceName);
       getServices[resourceName] = new WebService(funcPtr);
       break;
    case PUT:
-      //putServices[nPutServices].callback = funcPtr;
-      //strcpy(putServices[nPutServices++].resourceName, resourceName);
       putServices[resourceName] = new WebService(funcPtr);
       break;
    case POST:
-      //postServices[nPostServices].callback = funcPtr;
-      //strcpy(postServices[nPostServices++].resourceName, resourceName);      
       postServices[resourceName] = new WebService(funcPtr);
       break;
    case DELETE:
-      //deleteServices[nDeleteServices].callback = funcPtr;
-      //strcpy(deleteServices[nDeleteServices++].resourceName, resourceName);      
       deleteServices[resourceName] = new WebService(funcPtr);
       break;
    }
 }
 
 WebService* ApplicationServer::fetchService(HTTPVerb verb, char* resourceName) {
-   //int nServices;
-   //WebService* services;
-
    switch(verb) {
    case GET:
-      //nServices = nGetServices;
-      //services = getServices;
       return getServices[resourceName];      
-      //break;
    case PUT:
-      //nServices = nPutServices;
-      //services = putServices;
       return putServices[resourceName];      
-      //break;
    case POST:
-      //nServices = nPostServices;
-      //services = postServices;
       return postServices[resourceName];      
-      //break;
    case DELETE:
-      //nServices = nDeleteServices;
-      //services = deleteServices;
       return deleteServices[resourceName];      
-      //break;
    default:
-      //nServices = nGetServices;
-      //services = getServices;
       return getServices[resourceName];      
-      //break;
    }
-
-   /*
-   for (int i = 0; i < nServices; i++) {
-      if (stringEquals(services[i].resourceName, resourceName)) {
-         return &services[i];
-      }
-   }
-   */
-
-   //return NULL;
 }
 
 void ApplicationServer::setHtdocsDirectory(char* htdocsDirectory) {
