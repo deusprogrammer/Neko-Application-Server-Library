@@ -1,10 +1,12 @@
 #ifndef NEKOSERVER_H
 #define NEKOSERVER_H
 
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -112,6 +114,7 @@ void* ServerThread(void* lpargs);
 
 void Easter();
 void PrintNekoBadge();
+void signalHandler(int sigNum);
 
 enum HTTPProtocol {HTTP, HTTPS};
 enum HTTPVerb {GET, PUT, POST, DELETE};
@@ -183,6 +186,10 @@ protected:
    int nPutServices;
    int nPostServices;
    int nDeleteServices;
+
+   static bool shutdown;
+   static int nThreads;
+   static int nSignals;
 public:
    ApplicationServer();
    ~ApplicationServer();
@@ -206,5 +213,12 @@ public:
    WebService* fetchService(HTTPVerb verb, char* resourceName);
 
    bool isRunning() {return status == RUNNING;}
+
+   static void signalHandler(int sigNum);
+   static bool emergencyShutdown() {return shutdown;}
+   static void incrementThreadCount() {ApplicationServer::nThreads++;}
+   static void decrementThreadCount() {ApplicationServer::nThreads--;}
+   static int getThreadCount() {return ApplicationServer::nThreads;}
 };
+
 #endif

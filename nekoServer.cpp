@@ -1,5 +1,9 @@
 #include "nekoServer.h"
 
+bool ApplicationServer::shutdown = false;
+int ApplicationServer::nThreads = 0;
+int ApplicationServer::nSignals = 0;
+
 void Easter() {
    printf("%s\n\n", NYAN2);
 }
@@ -104,6 +108,14 @@ ApplicationServer::ApplicationServer() {
    nGetServices = nPutServices = nPostServices = nDeleteServices = 0;
 
    mkdir("./htdocs/", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+
+   signal(SIGINT, ApplicationServer::signalHandler);
+   signal(SIGQUIT, ApplicationServer::signalHandler);
+   signal(SIGHUP, ApplicationServer::signalHandler);
+   signal(SIGTERM, ApplicationServer::signalHandler);
+   signal(SIGTSTP, ApplicationServer::signalHandler);
+   signal(SIGUSR1, SIG_IGN);
+   signal(SIGUSR2, SIG_IGN);
 }
 
 ApplicationServer::ApplicationServer(HTTPProtocol type, char* appName, int maxConnections, char* port) {
@@ -130,6 +142,14 @@ ApplicationServer::ApplicationServer(HTTPProtocol type, char* appName, int maxCo
       strcpy(this->port, port); 
 
    nGetServices = nPutServices = nPostServices = nDeleteServices = 0;
+
+   signal(SIGINT, ApplicationServer::signalHandler);
+   signal(SIGQUIT, ApplicationServer::signalHandler);
+   signal(SIGHUP, ApplicationServer::signalHandler);
+   signal(SIGTERM, ApplicationServer::signalHandler);
+   signal(SIGTSTP, ApplicationServer::signalHandler);
+   signal(SIGUSR1, SIG_IGN);
+   signal(SIGUSR2, SIG_IGN);
 }
 
 ApplicationServer::~ApplicationServer() {
@@ -178,6 +198,27 @@ char* ApplicationServer::getHtdocsDirectory() {
       return htdocsDirectory;
 }
 
+void ApplicationServer::signalHandler(int sigNum) {
+   ApplicationServer::shutdown = true;
+
+   printf("Caught signal %d\n", sigNum);
+
+   switch(sigNum) {
+   case SIGTSTP:
+   case SIGINT:
+   case SIGTERM:
+   case SIGQUIT:
+   case SIGHUP:
+      printf("Shutting down...\n");
+      nSignals++;
+      break;
+   };
+
+   if (nSignals > 3) {
+      kill(getpid(), SIGKILL);
+   }
+}
+
 #ifdef _WIN32
 DWORD WINAPI ServerThread(LPVOID lpargs) {
 #else
@@ -190,6 +231,7 @@ void* ServerThread(void* lpargs) {
    char* port = appServer->getPort();
 
    appServer->setStatus(RUNNING);
+   ApplicationServer::incrementThreadCount();
          
    #ifdef _WIN32
    InitializeWS();
@@ -213,8 +255,19 @@ void* ServerThread(void* lpargs) {
       printf("Using %s\n", SSLeay_version(SSLEAY_VERSION));
 
    Socket* eClient;
+   listener->setNoBlock();
 
-   while ((eClient = listener->accept()) && appServer->getStatus() == RUNNING) {
+   while (appServer->getStatus() == RUNNING && !ApplicationServer::emergencyShutdown()) {
+      eClient = listener->accept();
+
+      if (!eClient && listener->wouldBlock()) {
+         continue;
+      }
+      else if (!eClient && !listener->wouldBlock()) {
+         printf("Error in accept()! ERROR %d\n", errno);
+         break;
+      }
+
       if (appServer->getAvailableConnections() <= 0 || eClient->wasError()) {
          eClient->close();
          continue;
@@ -231,12 +284,11 @@ void* ServerThread(void* lpargs) {
 
    appServer->setStatus(STOPPED);
 
-   CloseSocket(server);
-
    #ifdef _WIN32
    CleanupWS();
    #endif
 
+   ApplicationServer::decrementThreadCount();
 
    ExitThreadM(0);
 }
@@ -250,6 +302,8 @@ void* SocketThread(void* lpargs) {
    char *data = NULL;
    int nBytes = 0;
    bool reading = true;
+
+   ApplicationServer::incrementThreadCount();
 
    ApplicationServerArgs* asa = (ApplicationServerArgs*)lpargs;
    Socket* client = asa->sock;
@@ -274,6 +328,7 @@ void* SocketThread(void* lpargs) {
          if (timer.isExpired()) {
             printf("TIME OUT!\n");
             client->close();
+            ApplicationServer::decrementThreadCount();
             ExitThreadM(0);
          }
          else
@@ -283,6 +338,7 @@ void* SocketThread(void* lpargs) {
       else if (nBytes < 0 && !client->wouldBlock()) {
          printf("READ FAILED!\n");
          client->close();
+         ApplicationServer::decrementThreadCount();
          ExitThreadM(0);
       }
       //Data available to read
@@ -294,6 +350,7 @@ void* SocketThread(void* lpargs) {
          if (header.isMalformed()) {
             printf("MALFORMED HTTP HEADER!\n");
             client->close();
+            ApplicationServer::decrementThreadCount();
             ExitThreadM(0);
          }
 
@@ -359,5 +416,6 @@ void* SocketThread(void* lpargs) {
    appServer->decrementConnectionCount();
 
    printf("Exiting thread...\n\n");
+   ApplicationServer::decrementThreadCount();
    ExitThreadM(0);
 }

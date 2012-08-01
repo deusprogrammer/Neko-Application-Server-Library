@@ -289,8 +289,12 @@ int SSLTCPSocket::readLine(LPVOID data, int buf_sz) {
 }
 
 void SSLTCPSocket::close() {
-   SSL_shutdown(ssl);
-   CloseSocket(sock);
+   if (ssl) {
+      SSL_shutdown(ssl);
+   }
+   if (sock) {
+      CloseSocket(sock);
+   }
 }
 
 #ifdef _WIN32
@@ -576,7 +580,7 @@ SOCKET AcceptConnection(SOCKET sock) {
    // Accept a client socket
    client = accept(sock, NULL, NULL);
    if (client == INVALID_SOCKET) {
-      CloseSocket(sock);
+      //CloseSocket(sock);
       return -1;
    }
 

@@ -151,7 +151,7 @@ public:
 
    bool setFD(SOCKET sock);
    bool setNoBlock();
-   bool wouldBlock() {return SSL_get_error(ssl, sslError) == SSL_ERROR_WANT_READ;}
+   bool wouldBlock() {if (endPoint == CLIENT) return SSL_get_error(ssl, sslError) == SSL_ERROR_WANT_READ; else if (endPoint == LISTENER) return errno == EWOULDBLOCK;}
    int getError() {return errno;}
 
    bool connect(char* hostname, char* port);
