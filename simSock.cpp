@@ -159,28 +159,48 @@ bool SSLTCPSocket::setFD(SOCKET sock) {
    }
 
    int ret;
+   bool handshaking = true;
 
    switch(endPoint) {
    case CLIENT:
-      if (SSL_connect(ssl) <= 0) {
-         SSL_shutdown(ssl);
-         SSL_free(ssl);
-         return false;
+      while (handshaking) {
+         ret = SSL_connect(ssl);
+         if (ret <= 0 && SSL_get_error(ssl, ret) != SSL_ERROR_WANT_CONNECT) {
+            fprintf(stderr, "SSL_connect failed!\n");
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
+            return false;
+         }
+         else if (ret <= 0 && SSL_get_error(ssl, ret) == SSL_ERROR_WANT_CONNECT) {
+            continue;
+         }
+         else {
+            handshaking = false;
+         }
       }
       break;
    case LISTENER:
       break;
    case SERVER:
    default:
-      if ((ret = SSL_accept(ssl)) <= 0) {
-         fprintf(stderr, "SSL_accept failed!\n");
-         ERR_print_errors_fp(stderr);
+      while (handshaking) {
+         ret = SSL_accept(ssl);
+         if (ret <= 0 && SSL_get_error(ssl, ret) != SSL_ERROR_WANT_ACCEPT) {
+            fprintf(stderr, "SSL_accept failed!\n");
+            ERR_print_errors_fp(stderr);
 
-         this->error = -1;
+            this->error = -1;
 
-         SSL_shutdown(ssl);
-         SSL_free(ssl);
-         return false;
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
+            return false;
+         }
+         else if (ret <= 0 && SSL_get_error(ssl, ret) == SSL_ERROR_WANT_ACCEPT) {
+            continue;
+         }
+         else {
+            handshaking = false;
+         }
       }
       break;
    };
@@ -217,6 +237,8 @@ bool SSLTCPSocket::connect(char* hostname, char* port) {
       return false;
 
    this->setFD(client);
+
+   return true;
 }
 
 bool SSLTCPSocket::bind(char* port) {
@@ -229,6 +251,7 @@ bool SSLTCPSocket::bind(char* port) {
       return false;
 
    this->sock = server;
+   return true;
 }
 
 Socket* SSLTCPSocket::accept() {

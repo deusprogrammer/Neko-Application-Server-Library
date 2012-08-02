@@ -247,7 +247,12 @@ void* ServerThread(void* lpargs) {
       break;
    };   
 
-   listener->bind(port);
+   if (!listener->bind(port)) {
+      fprintf(stderr, "Unable to bind port %s (ERROR: %d)\n", port, errno);
+      appServer->setStatus(STOPPED);
+      ApplicationServer::decrementThreadCount();
+      ExitThreadM(0);
+   }
 
    printf("%s listening on port %s...\n", appServer->getAppName(), appServer->getPort());
 
