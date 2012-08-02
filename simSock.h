@@ -145,8 +145,11 @@ private:
    SSL* ssl;
    SSL_CTX *tlsctx;
    int sslError;
+
+   char certificatePath[1024];
+   char privateKeyPath[1024];
 public:
-   SSLTCPSocket(int endPoint = SERVER);
+   SSLTCPSocket(int endPoint = SERVER, char* certPath = "server.crt", char* keyPath = "server.key");
    ~SSLTCPSocket();
 
    bool setFD(SOCKET sock);
@@ -164,4 +167,5 @@ public:
    int readLine(LPVOID data, int buf_sz);
    void close();
 };
+
 #endif

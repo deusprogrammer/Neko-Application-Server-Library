@@ -177,6 +177,9 @@ protected:
    int nConnections;
    int maxConnections;
 
+   char certificatePath[1024];
+   char privateKeyPath[1024];
+
    map<string, WebService*> getServices;
    map<string, WebService*> putServices;
    map<string, WebService*> postServices;
@@ -209,6 +212,11 @@ public:
    char* getPort() {return port;}
    char* getAppName() {return appName;}
    HTTPProtocol getType() {return type;}
+
+   void setCertificatePath(char* certPath) {strcpy(this->certificatePath, certPath);}
+   void setPrivateKeyPath(char* keyPath) {strcpy(this->privateKeyPath, keyPath);}
+   char* getCertificatePath() {return this->certificatePath;}
+   char* getPrivateKeyPath() {return this->privateKeyPath;}
 
    WebService* fetchService(HTTPVerb verb, char* resourceName);
 

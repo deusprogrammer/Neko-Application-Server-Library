@@ -107,10 +107,12 @@ void TCPSocket::close() {
    return CloseSocket(sock);
 }
 
-SSLTCPSocket::SSLTCPSocket(int endPoint) {
+SSLTCPSocket::SSLTCPSocket(int endPoint, char* certPath, char* keyPath) {
    sock = -1; 
    ssl = NULL;
    this->endPoint = endPoint;
+   strcpy(this->certificatePath, certPath);
+   strcpy(this->privateKeyPath, keyPath);
 
    SSL_load_error_strings();
    SSL_library_init();
@@ -126,8 +128,8 @@ SSLTCPSocket::SSLTCPSocket(int endPoint) {
    default:
       tlsctx = SSL_CTX_new(SSLv23_server_method());
       SSL_CTX_set_options(tlsctx, SSL_OP_SINGLE_DH_USE);
-      SSL_CTX_use_certificate_file(tlsctx, "server.crt" , SSL_FILETYPE_PEM);
-      SSL_CTX_use_PrivateKey_file(tlsctx, "server.key", SSL_FILETYPE_PEM);
+      SSL_CTX_use_certificate_file(tlsctx, this->certificatePath , SSL_FILETYPE_PEM);
+      SSL_CTX_use_PrivateKey_file(tlsctx, this->privateKeyPath, SSL_FILETYPE_PEM);
       break;
    };
 }
@@ -265,7 +267,7 @@ Socket* SSLTCPSocket::accept() {
    if (client == -1)
       return NULL;
 
-   SSLTCPSocket* sslClient = new SSLTCPSocket(SERVER);
+   SSLTCPSocket* sslClient = new SSLTCPSocket(SERVER, this->certificatePath, this->privateKeyPath);
    sslClient->setFD(client);
 
    return sslClient;

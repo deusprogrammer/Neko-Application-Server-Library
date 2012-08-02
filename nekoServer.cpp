@@ -89,6 +89,7 @@ WebService::WebService(void *(*funcPtr)(Socket*, HTTPHeaderObject*, void*)) {
 
 void ApplicationServer::start() {
    PrintNekoBadge();
+
    CreateThreadM(ServerThread, this);
    while(!this->isRunning());
 }
@@ -105,6 +106,10 @@ ApplicationServer::ApplicationServer() {
    this->maxConnections = 10;
    this->status = STOPPED;
    strcpy(this->htdocsDirectory, "htdocs");
+
+   strcpy(this->certificatePath, "server.crt");
+   strcpy(this->privateKeyPath, "server.key");
+
    nGetServices = nPutServices = nPostServices = nDeleteServices = 0;
 
    mkdir("./htdocs/", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
@@ -122,6 +127,10 @@ ApplicationServer::ApplicationServer(HTTPProtocol type, char* appName, int maxCo
    this->type = type;
 
    strcpy(this->appName, appName);
+
+   strcpy(this->certificatePath, "server.crt");
+   strcpy(this->privateKeyPath, "server.key");
+
    this->status = STOPPED;
 
    this->nConnections = 0;
@@ -209,12 +218,12 @@ void ApplicationServer::signalHandler(int sigNum) {
    case SIGTERM:
    case SIGQUIT:
    case SIGHUP:
-      printf("Shutting down...\n");
+      printf("Shutting down...if you want to kill the process, just hit CTRL-C again.\n");
       nSignals++;
       break;
    };
 
-   if (nSignals > 3) {
+   if (nSignals >= 2) {
       kill(getpid(), SIGKILL);
    }
 }
@@ -243,7 +252,7 @@ void* ServerThread(void* lpargs) {
       listener = new TCPSocket(LISTENER);
       break;
    case HTTPS:
-      listener = new SSLTCPSocket(LISTENER);
+      listener = new SSLTCPSocket(LISTENER, appServer->getCertificatePath(), appServer->getPrivateKeyPath());
       break;
    };   
 
