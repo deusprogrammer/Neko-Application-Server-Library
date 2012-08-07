@@ -38,11 +38,11 @@ void HTTPRequest::init(char* cVerb, char** tokens, int nTokens) {
             if (nElements == 2)
                queryStringMap[qElements[0]] = qElements[1];
 
-            free(qElements);
+            delete qElements;
          }
       }
 
-      free(qTokens);
+      delete qTokens;
    }
 
    stringCopy(resource, tokens[0]);
@@ -420,10 +420,11 @@ void* SocketThread(void* lpargs) {
          }
 
          client->close();
+         delete client;
       }
    }
 
-   printf("Cleaning up...\n", header.getRequest()->getResource());
+   printf("Cleaning up...\n");
    if (data)
       delete data;
 
