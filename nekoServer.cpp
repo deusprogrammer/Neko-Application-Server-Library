@@ -61,13 +61,16 @@ void HTTPHeaderObject::consumeLine(char* line) {
       char** tokens;
 
       tokens = stringSplit(next, " ", &nTokens);
-      resource = tokens[0];
-      httpVersion = tokens[1];
+      if (nTokens >= 2) {
+         resource = tokens[0];
+         httpVersion = tokens[1];
 
-      httpRequest.init(token, tokens, nTokens);
-      malformed = false;
+         httpRequest.init(token, tokens, nTokens);
+         malformed = false;
+      }
 
-      delete tokens;
+      if (tokens)
+         delete tokens;
    }
    else if (stringEquals(token, "Content-Length")) {
       char* p = next;
@@ -162,6 +165,20 @@ ApplicationServer::ApplicationServer(HTTPProtocol type, char* appName, int maxCo
 }
 
 ApplicationServer::~ApplicationServer() {
+   map<string, WebService*>::iterator it;
+
+   for (it = getServices.begin(); it != getServices.end(); it++) {
+      delete it->second;
+   }
+   for (it = putServices.begin(); it != putServices.end(); it++) {
+      delete it->second;
+   }
+   for (it = postServices.begin(); it != postServices.end(); it++) {
+      delete it->second;
+   }
+   for (it = deleteServices.begin(); it != deleteServices.end(); it++) {
+      delete it->second;
+   }
 }
 
 void ApplicationServer::addService(HTTPVerb verb, char* resourceName, void *(*funcPtr)(Socket*, HTTPHeaderObject*, void*)) {
@@ -254,7 +271,7 @@ void* ServerThread(void* lpargs) {
    case HTTPS:
       listener = new SSLTCPSocket(LISTENER, appServer->getCertificatePath(), appServer->getPrivateKeyPath());
       break;
-   };   
+   };
 
    if (!listener->bind(port)) {
       fprintf(stderr, "Unable to bind port %s (ERROR: %d)\n", port, errno);
@@ -277,13 +294,18 @@ void* ServerThread(void* lpargs) {
       if (!eClient && listener->wouldBlock()) {
          continue;
       }
-      else if (!eClient && !listener->wouldBlock()) {
-         printf("Error in accept()! ERROR %d\n", errno);
+      else if (!eClient && !listener->wouldBlock() && !listener->wasFatalError()) {
+         fprintf(stderr, "Non-fatal error\n");
+         continue;
+      }
+      else if (!eClient && !listener->wouldBlock() && listener->wasFatalError()) {
+         fprintf(stderr, "FATAL ERROR!\n");
          break;
       }
 
-      if (appServer->getAvailableConnections() <= 0 || eClient->wasError()) {
+      if (appServer->getAvailableConnections() <= 0) {
          eClient->close();
+         delete eClient;
          continue;
       }
 
@@ -296,7 +318,13 @@ void* ServerThread(void* lpargs) {
       CreateThreadM(SocketThread, (LPVOID)appArgs);
    }
 
+   printf("Main accept loop exited...\n");
+
    appServer->setStatus(STOPPED);
+
+   printf("Cleaning up...\n");
+   listener->close();
+   delete listener;
 
    #ifdef _WIN32
    CleanupWS();
@@ -326,6 +354,8 @@ void* SocketThread(void* lpargs) {
    Timer timer(TIMEOUT);
    timer.start();
 
+   delete asa;
+
    client->setNoBlock();
 
    printf("Consuming HTTP header...\n");
@@ -341,7 +371,10 @@ void* SocketThread(void* lpargs) {
          //Implement a timeout here.
          if (timer.isExpired()) {
             printf("TIME OUT!\n");
+
             client->close();
+            delete client;
+
             ApplicationServer::decrementThreadCount();
             ExitThreadM(0);
          }
@@ -350,8 +383,11 @@ void* SocketThread(void* lpargs) {
       }
       //Socket closed
       else if (nBytes < 0 && !client->wouldBlock()) {
-         printf("READ FAILED!\n");
+         fprintf(stderr, "READ FAILED!\n");
+
          client->close();
+         delete client;
+
          ApplicationServer::decrementThreadCount();
          ExitThreadM(0);
       }
@@ -362,8 +398,11 @@ void* SocketThread(void* lpargs) {
          header.consumeLine(buffer);
 
          if (header.isMalformed()) {
-            printf("MALFORMED HTTP HEADER!\n");
+            fprintf(stderr, "MALFORMED HTTP HEADER!\n");
+
             client->close();
+            delete client;
+
             ApplicationServer::decrementThreadCount();
             ExitThreadM(0);
          }
@@ -381,8 +420,6 @@ void* SocketThread(void* lpargs) {
       do {
          nBytes = client->readLine(data, header.getContentLength());
          printf("\tRead %d bytes.\n", nBytes);
-         if (client->wouldBlock())
-            printf("\tClient would block.\n");
       } while (nBytes <= 0 && client->wouldBlock());
       data[nBytes] = 0;
    }
@@ -420,13 +457,15 @@ void* SocketThread(void* lpargs) {
          }
 
          client->close();
-         delete client;
       }
    }
 
    printf("Cleaning up...\n");
    if (data)
       delete data;
+
+   if (client)
+      delete client;
 
    appServer->decrementConnectionCount();
 

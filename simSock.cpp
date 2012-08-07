@@ -74,7 +74,10 @@ Socket* TCPSocket::accept() {
       return NULL;
 
    TCPSocket* tcpClient = new TCPSocket(SERVER);
-   tcpClient->setFD(client);
+   if (!tcpClient->setFD(client)) {
+      delete tcpClient;
+      return NULL;
+   }
 
    return tcpClient;
 }
@@ -111,6 +114,7 @@ SSLTCPSocket::SSLTCPSocket(int endPoint, char* certPath, char* keyPath) {
    sock = -1; 
    ssl = NULL;
    this->endPoint = endPoint;
+   this->fatalError = false;
    strcpy(this->certificatePath, certPath);
    strcpy(this->privateKeyPath, keyPath);
 
@@ -135,10 +139,22 @@ SSLTCPSocket::SSLTCPSocket(int endPoint, char* certPath, char* keyPath) {
 }
 
 SSLTCPSocket::~SSLTCPSocket() {
-   SSL_free(ssl);
-   SSL_CTX_free(tlsctx);
+   printf("In SSLTCPSocket::~SSLTCPSocket()\n");
 
+   if (ssl) {
+      printf("\tRunning SSL_free(ssl)\n");
+      SSL_free(ssl);
+   }
+
+   if (tlsctx) {
+      printf("\tRunning SSL_CTX_free(tlsctx);\n");
+      SSL_CTX_free(tlsctx);
+   }
+
+   printf("\tRunning ERR_free_strings();\n");
    ERR_free_strings();
+
+   printf("\tRunning EVP_cleanup();\n");
    EVP_cleanup();
 }
 
@@ -149,14 +165,15 @@ bool SSLTCPSocket::setFD(SOCKET sock) {
 
    if ((ssl = SSL_new(tlsctx)) == NULL) {
       fprintf(stderr, "SSL_new failed!\n");
+      CloseSocket(sock);
       return false;
    }
 
    if (!SSL_set_fd(ssl, sock)) {
       fprintf(stderr, "SSL_set_fd failed!\n");
-
       SSL_shutdown(ssl);
       SSL_free(ssl);
+      CloseSocket(sock);
       return false;
    }
 
@@ -169,8 +186,15 @@ bool SSLTCPSocket::setFD(SOCKET sock) {
          ret = SSL_connect(ssl);
          if (ret <= 0 && SSL_get_error(ssl, ret) != SSL_ERROR_WANT_CONNECT) {
             fprintf(stderr, "SSL_connect failed!\n");
+
+            this->error = -1;
+
             SSL_shutdown(ssl);
             SSL_free(ssl);
+            ssl = NULL;
+
+            CloseSocket(sock);
+
             return false;
          }
          else if (ret <= 0 && SSL_get_error(ssl, ret) == SSL_ERROR_WANT_CONNECT) {
@@ -195,6 +219,10 @@ bool SSLTCPSocket::setFD(SOCKET sock) {
 
             SSL_shutdown(ssl);
             SSL_free(ssl);
+            ssl = NULL;
+
+            CloseSocket(sock);
+
             return false;
          }
          else if (ret <= 0 && SSL_get_error(ssl, ret) == SSL_ERROR_WANT_ACCEPT) {
@@ -264,11 +292,20 @@ Socket* SSLTCPSocket::accept() {
 
    client = AcceptConnection(sock);
 
-   if (client == -1)
+   if (client == -1 && !wouldBlock()) {
+      setFatalError();
       return NULL;
+   }
+   else if (client == -1 && wouldBlock()) {
+      return NULL;
+   }
 
    SSLTCPSocket* sslClient = new SSLTCPSocket(SERVER, this->certificatePath, this->privateKeyPath);
-   sslClient->setFD(client);
+   if (!sslClient->setFD(client)) {
+      delete sslClient;
+      printf("Deleted sslClient!\n");
+      return NULL;
+   }
 
    return sslClient;
 }

@@ -98,14 +98,17 @@ protected:
    SOCKET sock;
    int error;
    int endPoint;
+   bool fatalError;
 public:
-   Socket(int endPoint = SERVER) {sock = -1; this->endPoint = endPoint;}
+   Socket(int endPoint = SERVER) {sock = -1; this->endPoint = endPoint; this->fatalError = false;}
    ~Socket() {}
    virtual bool setFD(SOCKET sock) {this->sock = sock; return true;}
    virtual bool setNoBlock();
    virtual bool wouldBlock() {return errno == EWOULDBLOCK;}
    virtual int getError() {return errno;}
    bool wasError() {return error == -1;}
+   virtual void setFatalError() {fatalError = true;}
+   virtual bool wasFatalError() {return fatalError;}
 
    virtual bool connect(char* hostname, char* port) {};
 
@@ -120,14 +123,15 @@ public:
 
 class TCPSocket: public Socket {
 protected:
-   SOCKET sock;
 public:
-   TCPSocket(int endPoint = SERVER) {sock = -1; this->endPoint = endPoint;}
+   TCPSocket(int endPoint = SERVER) {sock = -1; this->endPoint = endPoint; this->fatalError = false;}
    ~TCPSocket() {}
    bool setFD(SOCKET sock, int endPoint = SERVER) {printf("SET FD TO %d\n", sock); this->sock = sock; return true;}
    bool setNoBlock();
    bool wouldBlock() {return errno == EWOULDBLOCK;}
    int getError() {return errno;}
+   void setFatalError() {fatalError = true;}
+   bool wasFatalError() {return fatalError;}
 
    bool connect(char* hostname, char* port);
 
@@ -141,7 +145,7 @@ public:
 };
 
 class SSLTCPSocket: public Socket {
-private:
+protected:
    SSL* ssl;
    SSL_CTX *tlsctx;
    int sslError;
@@ -156,6 +160,8 @@ public:
    bool setNoBlock();
    bool wouldBlock() {if (endPoint == CLIENT || endPoint == SERVER) return SSL_get_error(ssl, sslError) == SSL_ERROR_WANT_READ; else if (endPoint == LISTENER) return errno == EWOULDBLOCK;}
    int getError() {return SSL_get_error(ssl, sslError);}
+   void setFatalError() {fatalError = true;}
+   bool wasFatalError() {return fatalError;}
 
    bool connect(char* hostname, char* port);
 
