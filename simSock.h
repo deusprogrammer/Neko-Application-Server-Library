@@ -147,14 +147,14 @@ public:
 class SSLTCPSocket: public Socket {
 protected:
    SSL* ssl;
-   SSL_CTX *tlsctx;
+   static SSL_CTX *serverContext, *clientContext;
    int sslError;
-
-   char certificatePath[1024];
-   char privateKeyPath[1024];
 public:
-   SSLTCPSocket(int endPoint = SERVER, char* certPath = "server.crt", char* keyPath = "server.key");
+   SSLTCPSocket(int endPoint = SERVER);
    ~SSLTCPSocket();
+   
+   static bool initSSL(char* certPath = "server.crt", char* keyPath = "server.key");
+   static void tearDownSSL();
 
    bool setFD(SOCKET sock);
    bool setNoBlock();

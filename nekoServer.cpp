@@ -269,7 +269,13 @@ void* ServerThread(void* lpargs) {
       listener = new TCPSocket(LISTENER);
       break;
    case HTTPS:
-      listener = new SSLTCPSocket(LISTENER, appServer->getCertificatePath(), appServer->getPrivateKeyPath());
+      if (!SSLTCPSocket::initSSL(appServer->getCertificatePath(), appServer->getPrivateKeyPath())) {
+         fprintf(stderr, "Unable to find certificate or key file for SSL!");
+         appServer->setStatus(STOPPED);
+         ApplicationServer::decrementThreadCount();
+         ExitThreadM(0);
+      }
+      listener = new SSLTCPSocket(LISTENER);
       break;
    };
 
@@ -325,6 +331,14 @@ void* ServerThread(void* lpargs) {
    printf("Cleaning up...\n");
    listener->close();
    delete listener;
+   
+   switch (appServer->getType()) {
+   case HTTP:
+      break;
+   case HTTPS:
+      SSLTCPSocket::tearDownSSL();
+      break;
+   };
 
    #ifdef _WIN32
    CleanupWS();

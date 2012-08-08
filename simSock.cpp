@@ -110,52 +110,46 @@ void TCPSocket::close() {
    return CloseSocket(sock);
 }
 
-SSLTCPSocket::SSLTCPSocket(int endPoint, char* certPath, char* keyPath) {
+SSL_CTX* SSLTCPSocket::serverContext = NULL;
+SSL_CTX* SSLTCPSocket::clientContext = NULL;
+
+bool SSLTCPSocket::initSSL(char* certPath, char* keyPath) {
+   SSL_load_error_strings();
+   SSL_library_init();
+   OpenSSL_add_all_algorithms();
+   
+   serverContext = SSL_CTX_new(SSLv23_server_method());
+   SSL_CTX_set_options(serverContext, SSL_OP_SINGLE_DH_USE);
+   if (!SSL_CTX_use_certificate_file(serverContext, certPath, SSL_FILETYPE_PEM)) {
+      return false;
+   }
+   
+   if (!SSL_CTX_use_PrivateKey_file(serverContext, keyPath, SSL_FILETYPE_PEM)) {
+      return false;
+   }
+   
+   clientContext = SSL_CTX_new(SSLv23_client_method());
+   SSL_CTX_set_options(clientContext, SSL_OP_SINGLE_DH_USE);
+}
+
+void SSLTCPSocket::tearDownSSL() {
+   SSL_CTX_free(serverContext);
+   SSL_CTX_free(clientContext);
+   ERR_free_strings();
+   EVP_cleanup();
+}
+
+SSLTCPSocket::SSLTCPSocket(int endPoint) {
    sock = -1; 
    ssl = NULL;
    this->endPoint = endPoint;
    this->fatalError = false;
-   strcpy(this->certificatePath, certPath);
-   strcpy(this->privateKeyPath, keyPath);
-
-   SSL_load_error_strings();
-   SSL_library_init();
-   OpenSSL_add_all_algorithms();
-
-   switch (this->endPoint) {
-   case CLIENT:
-      tlsctx = SSL_CTX_new(SSLv23_client_method());
-      break;
-   case LISTENER:
-      break;
-   case SERVER:
-   default:
-      tlsctx = SSL_CTX_new(SSLv23_server_method());
-      SSL_CTX_set_options(tlsctx, SSL_OP_SINGLE_DH_USE);
-      SSL_CTX_use_certificate_file(tlsctx, this->certificatePath , SSL_FILETYPE_PEM);
-      SSL_CTX_use_PrivateKey_file(tlsctx, this->privateKeyPath, SSL_FILETYPE_PEM);
-      break;
-   };
 }
 
 SSLTCPSocket::~SSLTCPSocket() {
-   printf("In SSLTCPSocket::~SSLTCPSocket()\n");
-
    if (ssl) {
-      printf("\tRunning SSL_free(ssl)\n");
       SSL_free(ssl);
    }
-
-   if (tlsctx) {
-      printf("\tRunning SSL_CTX_free(tlsctx);\n");
-      SSL_CTX_free(tlsctx);
-   }
-
-   printf("\tRunning ERR_free_strings();\n");
-   ERR_free_strings();
-
-   printf("\tRunning EVP_cleanup();\n");
-   EVP_cleanup();
 }
 
 bool SSLTCPSocket::setFD(SOCKET sock) {
@@ -163,11 +157,25 @@ bool SSLTCPSocket::setFD(SOCKET sock) {
 
    this->sock = sock;
 
-   if ((ssl = SSL_new(tlsctx)) == NULL) {
-      fprintf(stderr, "SSL_new failed!\n");
-      CloseSocket(sock);
-      return false;
-   }
+   switch(endPoint) {
+   case CLIENT:
+      if ((ssl = SSL_new(SSLTCPSocket::clientContext)) == NULL) {
+         fprintf(stderr, "SSL_new failed!\n");
+        CloseSocket(sock);
+         return false;
+      }
+      break;
+   case SERVER:
+      if ((ssl = SSL_new(SSLTCPSocket::serverContext)) == NULL) {
+         fprintf(stderr, "SSL_new failed!\n");
+         CloseSocket(sock);
+         return false;
+      }
+      break;
+   case LISTENER:
+   default:
+      return true;
+   };
 
    if (!SSL_set_fd(ssl, sock)) {
       fprintf(stderr, "SSL_set_fd failed!\n");
@@ -205,10 +213,7 @@ bool SSLTCPSocket::setFD(SOCKET sock) {
          }
       }
       break;
-   case LISTENER:
-      break;
    case SERVER:
-   default:
       while (handshaking) {
          ret = SSL_accept(ssl);
          if (ret <= 0 && SSL_get_error(ssl, ret) != SSL_ERROR_WANT_ACCEPT) {
@@ -300,10 +305,9 @@ Socket* SSLTCPSocket::accept() {
       return NULL;
    }
 
-   SSLTCPSocket* sslClient = new SSLTCPSocket(SERVER, this->certificatePath, this->privateKeyPath);
+   SSLTCPSocket* sslClient = new SSLTCPSocket(SERVER);
    if (!sslClient->setFD(client)) {
       delete sslClient;
-      printf("Deleted sslClient!\n");
       return NULL;
    }
 
