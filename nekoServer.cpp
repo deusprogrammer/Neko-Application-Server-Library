@@ -305,10 +305,12 @@ void* ServerThread(void* lpargs) {
       eClient = listener->accept();
 
       if (!eClient && listener->wouldBlock()) {
+         sleep(1);
          continue;
       }
       else if (!eClient && !listener->wouldBlock() && !listener->wasFatalError()) {
          fprintf(stderr, "Non-fatal error\n");
+         sleep(1);
          continue;
       }
       else if (!eClient && !listener->wouldBlock() && listener->wasFatalError()) {
@@ -399,8 +401,10 @@ void* SocketThread(void* lpargs) {
             ApplicationServer::decrementThreadCount();
             ExitThreadM(0);
          }
-         else
+         else {
+            sleep(1);
             continue;
+         }
       }
       //Socket closed
       else if (nBytes < 0 && !client->wouldBlock()) {
