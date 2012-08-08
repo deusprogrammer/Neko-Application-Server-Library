@@ -130,6 +130,8 @@ bool SSLTCPSocket::initSSL(char* certPath, char* keyPath) {
    
    clientContext = SSL_CTX_new(SSLv23_client_method());
    SSL_CTX_set_options(clientContext, SSL_OP_SINGLE_DH_USE);
+   
+   return true;
 }
 
 void SSLTCPSocket::tearDownSSL() {
