@@ -107,7 +107,10 @@ int TCPSocket::readLine(LPVOID data, int buf_sz) {
 }
 
 void TCPSocket::close() {
-   return CloseSocket(sock);
+   if (!isClosed) { 
+      CloseSocket(sock); 
+      isClosed = true;
+   }
 }
 
 SSL_CTX* SSLTCPSocket::serverContext = NULL;
@@ -142,6 +145,8 @@ void SSLTCPSocket::tearDownSSL() {
 }
 
 SSLTCPSocket::SSLTCPSocket(int endPoint) {
+   printf("SSLTCPSocket(%d)::CREATED %u\n", endPoint, this);
+
    sock = -1; 
    ssl = NULL;
    this->endPoint = endPoint;
@@ -149,14 +154,16 @@ SSLTCPSocket::SSLTCPSocket(int endPoint) {
 }
 
 SSLTCPSocket::~SSLTCPSocket() {
+   printf("SSLTCPSocket(%d)::DELETED %u\n", endPoint, this);
+   
    if (ssl) {
       SSL_free(ssl);
    }
+   
+   ERR_remove_state(0);
 }
 
 bool SSLTCPSocket::setFD(SOCKET sock) {
-   printf("SET FD TO %d\n", sock);
-
    this->sock = sock;
 
    switch(endPoint) {
@@ -357,11 +364,10 @@ int SSLTCPSocket::readLine(LPVOID data, int buf_sz) {
 }
 
 void SSLTCPSocket::close() {
-   if (ssl) {
+   if (!isClosed && ssl && sock) {
       SSL_shutdown(ssl);
-   }
-   if (sock) {
       CloseSocket(sock);
+      isClosed = true;
    }
 }
 

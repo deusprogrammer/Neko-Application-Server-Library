@@ -13,10 +13,7 @@ void PrintNekoBadge() {
    printf("%s\n\n", NYAN1);
 }
 
-void HTTPRequest::init(char* cVerb, char** tokens, int nTokens) {
-   if (nTokens < 2)
-      return;
-
+void HTTPRequest::init(char* cVerb, char* resource, char* httpVersion) {
    if (stringEquals(cVerb, "GET"))
       verb = GET;
    else if (stringEquals(cVerb, "PUT"))
@@ -26,9 +23,9 @@ void HTTPRequest::init(char* cVerb, char** tokens, int nTokens) {
    else if(stringEquals(cVerb, "DELETE"))
       verb = DELETE;
 
-   if (stringContains(tokens[0], '?')) {
+   if (stringContains(resource, '?')) {
       int nQTokens;
-      char** qTokens = stringSplit(tokens[0], "?&", &nQTokens);
+      char** qTokens = stringSplit(resource, "?&", &nQTokens);
 
       for (int i = 0; i < nQTokens; i++) {
          if (stringContains(qTokens[i], '=')) {
@@ -38,15 +35,19 @@ void HTTPRequest::init(char* cVerb, char** tokens, int nTokens) {
             if (nElements == 2)
                queryStringMap[qElements[0]] = qElements[1];
 
-            delete qElements;
+            if (qElements) {
+               delete qElements;
+            }
          }
       }
 
-      delete qTokens;
+      if (qTokens) {
+         delete qTokens;
+      }
    }
 
-   stringCopy(resource, tokens[0]);
-   stringCopy(httpVersion, tokens[1]);
+   stringCopy(this->resource, resource);
+   stringCopy(this->httpVersion, httpVersion);
 }
 
 void HTTPHeaderObject::consumeLine(char* line) {
@@ -65,7 +66,7 @@ void HTTPHeaderObject::consumeLine(char* line) {
          resource = tokens[0];
          httpVersion = tokens[1];
 
-         httpRequest.init(token, tokens, nTokens);
+         httpRequest.init(token, resource, httpVersion);
          malformed = false;
       }
 
@@ -102,6 +103,8 @@ void ApplicationServer::stop() {
 }
 
 ApplicationServer::ApplicationServer() {
+   printf("ApplicationServer::CREATED %u\n", this);
+
    type = HTTP;
    strcpy(this->appName, "NekoServer");
    strcpy(this->port, "80");
@@ -127,6 +130,8 @@ ApplicationServer::ApplicationServer() {
 }
 
 ApplicationServer::ApplicationServer(HTTPProtocol type, char* appName, int maxConnections, char* port) {
+   printf("ApplicationServer::CREATED %u\n", this);
+   
    this->type = type;
 
    strcpy(this->appName, appName);
@@ -165,6 +170,8 @@ ApplicationServer::ApplicationServer(HTTPProtocol type, char* appName, int maxCo
 }
 
 ApplicationServer::~ApplicationServer() {
+   printf("ApplicationServer::DELETED %u\n", this);
+
    map<string, WebService*>::iterator it;
 
    for (it = getServices.begin(); it != getServices.end(); it++) {
@@ -354,7 +361,7 @@ DWORD WINAPI SocketThread(LPVOID lpargs) {
 #else
 void* SocketThread(void* lpargs) {
 #endif
-   char buffer[4096];
+   char buffer[1024];
    char *data = NULL;
    int nBytes = 0;
    bool reading = true;
@@ -443,6 +450,7 @@ void* SocketThread(void* lpargs) {
    if (webService) {
       printf("\tFound %s...\n", header.getRequest()->getResource());
       webService->callback(client, &header, data);
+      client->close();
    }
    else {
       char path[1024];
@@ -478,8 +486,9 @@ void* SocketThread(void* lpargs) {
    if (data)
       delete data;
 
-   if (client)
+   if (client) {
       delete client;
+   }
 
    appServer->decrementConnectionCount();
 

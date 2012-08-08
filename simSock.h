@@ -99,9 +99,10 @@ protected:
    int error;
    int endPoint;
    bool fatalError;
+   bool isClosed;
 public:
-   Socket(int endPoint = SERVER) {sock = -1; this->endPoint = endPoint; this->fatalError = false;}
-   ~Socket() {}
+   Socket(int endPoint = SERVER) {sock = -1; this->endPoint = endPoint; this->fatalError = false; this->isClosed = false;}
+   virtual ~Socket() {}
    virtual bool setFD(SOCKET sock) {this->sock = sock; return true;}
    virtual bool setNoBlock();
    virtual bool wouldBlock() {return errno == EWOULDBLOCK;}
@@ -118,7 +119,7 @@ public:
    virtual int write(LPVOID data, int buf_sz) {}
    virtual int read(LPVOID data, int buf_sz) {}
    virtual int readLine(LPVOID data, int buf_sz) {}
-   virtual void close() {CloseSocket(sock);}
+   virtual void close() {if (!isClosed) { CloseSocket(sock); isClosed = true;}}
 };
 
 class TCPSocket: public Socket {

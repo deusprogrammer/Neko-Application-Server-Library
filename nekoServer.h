@@ -126,8 +126,9 @@ private:
    map<string, string> queryStringMap;
    char resource[1024], httpVersion[64];
 public:
-   HTTPRequest() {}
-   void init(char* verb, char** tokens, int nTokens);
+   HTTPRequest() {printf("HTTPRequest::CREATED %u\n", this);}
+   ~HTTPRequest() {printf("HTTPRequest::DELETED %u\n", this);}
+   void init(char* verb, char* resource, char* httpVersion);
    HTTPVerb getVerb() {return verb;}
    char* getResource() {return resource;}
    char* getHTTPVersion() {return httpVersion;}
@@ -143,7 +144,8 @@ private:
 
    bool malformed;
 public:
-   HTTPHeaderObject() {contentLength = 0; malformed = true;}
+   HTTPHeaderObject() {printf("HTTPHeaderObject::CREATED %u\n", this); contentLength = 0; malformed = true;}
+   ~HTTPHeaderObject() {printf("HTTPHeaderObject::DELETED %u\n", this);}
    void consumeLine(char* line);
    bool isMalformed() {return malformed;}
    int getContentLength() {return contentLength;}
@@ -165,6 +167,9 @@ struct WebService {
 struct ApplicationServerArgs {
    Socket* sock;
    ApplicationServer* appServer;
+   
+   ApplicationServerArgs() {printf("ApplicationServerArgs::CREATED %u\n", this);}
+   ~ApplicationServerArgs() {printf("ApplicationServerArgs::DELETED %u\n", this);}
 };
 
 class ApplicationServer {

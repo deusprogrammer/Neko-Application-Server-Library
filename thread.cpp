@@ -12,6 +12,7 @@ void ExitThreadM(void* returnValue) {
 pthread_t CreateThreadM(void *(*start_routine)(void*), void *arg) {
    pthread_t handle;
    pthread_create(&handle, NULL, start_routine, arg);
+   pthread_detach(handle);
    return handle;
 }
 
