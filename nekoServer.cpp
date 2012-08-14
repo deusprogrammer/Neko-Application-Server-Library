@@ -46,8 +46,8 @@ void HTTPRequest::init(char* cVerb, char* resource, char* httpVersion) {
       }
    }
 
-   stringCopy(this->resource, resource);
-   stringCopy(this->httpVersion, httpVersion);
+   strcpy(this->resource, resource);
+   strcpy(this->httpVersion, httpVersion);
 }
 
 void HTTPHeaderObject::consumeLine(char* line) {
@@ -438,19 +438,28 @@ void* SocketThread(void* lpargs) {
 
    printf("Checking content length...\n");
    if (header.getContentLength() > 0) {
-      data = new char[header.getContentLength()];
-
+      data = new char[header.getContentLength() + 1];
+      
       printf("Reading %d bytes of data...\n", header.getContentLength());
       int nBytes = 0;
+      int bytesRead = 0;
       do {
-         nBytes = client->readLine(data, header.getContentLength());
-         printf("\tRead %d bytes.\n", nBytes);
+         nBytes = client->read(buffer, 1024);
+         if (nBytes > 0) {
+            buffer[nBytes] = 0;
+            strcat(data, buffer);
+            printf("\tRead %d bytes.\n", nBytes);
+         }
       } while (nBytes <= 0 && client->wouldBlock());
-      data[nBytes] = 0;
    }
+   
+   //printf("BEFORE: %s\n", data);
 
-   printf("Checking for registered web service for %s...\n", header.getRequest()->getResource());
+   //printf("Checking for registered web service for %s...\n", header.getRequest()->getResource());
    WebService* webService = appServer->fetchService(header.getRequest()->getVerb(), header.getRequest()->getResource());
+
+   //printf("AFTER: %s\n", data);
+
    if (webService) {
       printf("\tFound %s...\n", header.getRequest()->getResource());
       webService->callback(client, &header, data);
