@@ -364,7 +364,8 @@ DWORD WINAPI SocketThread(LPVOID lpargs) {
 void* SocketThread(void* lpargs) {
 #endif
    char buffer[1024];
-   char *data = NULL;
+   char data[4096];
+   //char *data = NULL;
    int nBytes = 0;
    bool reading = true;
 
@@ -438,27 +439,24 @@ void* SocketThread(void* lpargs) {
 
    printf("Checking content length...\n");
    if (header.getContentLength() > 0) {
-      data = new char[header.getContentLength() + 1];
+      //data = new char[header.getContentLength() + 1];
       
       printf("Reading %d bytes of data...\n", header.getContentLength());
       int nBytes = 0;
       int bytesRead = 0;
       do {
-         nBytes = client->read(buffer, 1024);
+         nBytes = client->read(data + bytesRead, 4096);
          if (nBytes > 0) {
-            buffer[nBytes] = 0;
-            strcat(data, buffer);
-            printf("\tRead %d bytes.\n", nBytes);
+            bytesRead += nBytes;
+            data[bytesRead] = 0;
+            //strcat(data, buffer);
+            printf("\tRead %d bytes: %s\n", nBytes, data);
          }
       } while (nBytes <= 0 && client->wouldBlock());
    }
-   
-   //printf("BEFORE: %s\n", data);
 
    //printf("Checking for registered web service for %s...\n", header.getRequest()->getResource());
    WebService* webService = appServer->fetchService(header.getRequest()->getVerb(), header.getRequest()->getResource());
-
-   //printf("AFTER: %s\n", data);
 
    if (webService) {
       printf("\tFound %s...\n", header.getRequest()->getResource());
@@ -496,8 +494,8 @@ void* SocketThread(void* lpargs) {
    }
 
    printf("Cleaning up...\n");
-   if (data)
-      delete data;
+   //if (data)
+   //   delete data;
 
    if (client) {
       delete client;
